@@ -1,0 +1,28 @@
+{
+	"name": "Bridges",
+	"desc": "Epic battle between two sides connected by multiple bridges",
+	"size_x": 8192,
+	"size_y": 1024,
+
+	"map": [
+		{
+			"back": "map-back.png",
+			"middle": "map.png",
+			"front": "map-front.png",
+			"anchor_y": "100%",
+			"position_y": "100%"
+		}
+	],
+	
+	"units": [
+		{"owner": -1, "type": "antiair", "x": 3435, "y": 5},
+		{"owner": -1, "type": "antiair", "x": 2222, "y": 97},
+		{"owner": -1, "type": "bomber",  "x": 1550, "y": 13},
+		{"owner": -1, "type": "bomber",  "x": -1330, "y": -42},
+		{"owner": -1, "type": "antiair", "x": -2010, "y": 101},
+		{"owner": -1, "type": "antiair", "x": -3225, "y": -15},
+		{"owner": -1, "type": "antiair", "x": -3440, "y": -14},
+		{"owner": -1, "type": "antiair", "x": -3556, "y": -18},
+		{"owner": -1, "type": "antiair", "x": -3800, "y": -14}
+	]
+}

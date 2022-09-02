@@ -1,0 +1,37 @@
+{
+	"name": "Bridges",
+	"desc": "epic battle between two sides connected by multiple bridges",
+
+	// map size in pixels where images are placed on.
+	// percentage positions are percentages of these dimensions.
+	"size_x": 65536,
+	"size_y": 8192,
+
+	// images from which the map is built from.
+	"pieces": [
+		{
+			// id: optional. used to link to other pieces if needed.
+			"piece_name": "middle1",
+			// optional: if not set: no collision map at all; can use image just a background/foreground too.
+			"map": "middle1.png",
+			// optional: if not set: set automatically as "middle1-back.png" and "middle1-front.png"
+			"back": "middle1-back.png",
+			"front": "middle1-front.png",
+
+			// decides from which point is set at the position in map.
+			// 0 0 = top left corner in pixels.
+			// 50% 50% = image middle point.
+			// 200% = twice the image size.
+			"anchor_x": "0",
+			"anchor_y": "100%",
+			// where in the world the image anchor position is placed on:
+			"position_x": "50%",
+			"position_y": "100%",
+			// flip/mirror:
+			"flip_x": false,
+			"flip_y": false,
+			// position relative to object id:
+			"relative_to": "middle1",
+		}
+	]
+}
