@@ -26,11 +26,24 @@
 
 <style>
 
-html, body, #loading_container {
+html, body {
     margin: 0;
     padding: 0;
     height: 100%;
     width: 100%;
+}
+
+
+
+
+#loading_container {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+	
+
+	text-shadow: rgba(0,0,0,0.5) 0px 0px 1.5px, rgba(0,0,0,0.2) 0px 0px 5px, rgba(0,0,0,0.15) 0px 0px 10px;
 }
 
 #loading_container {
@@ -59,7 +72,6 @@ html, body, #loading_container {
 }
 
 
-
 #loading_container_inner {
     display: table-cell;
     margin: 0;
@@ -71,16 +83,19 @@ html, body, #loading_container {
 
 #loading_text {
 	font:40px verdana;
-
 	margin: auto;
-	color:black;
-  
+	color:#000;
+}
 
+#loading_desc {
+	font:12px verdana;
+	color:#000;
 }
 
 
 
 
+/* Pure CSS Loaders: https://loading.io/css/ */
 
 .lds-ellipsis {
   display: inline-block;
@@ -95,8 +110,9 @@ html, body, #loading_container {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-
   background: #000;
+  
+  box-shadow: rgba(0,0,0, 0.5) 0px 0px 1px, rgba(0,0,0, 0.5) 0px 0px 8px, rgba(0,0,0, 0.3) 0px 0px 16px;
 }
 .lds-ellipsis div:nth-child(1) {
   left: 8px;
@@ -143,6 +159,8 @@ html, body, #loading_container {
 
 
 
+/* Pure CSS Loaders: https://loading.io/css/ */
+
 .lds-ellipsis-left {
   display: inline-block;
   position: relative;
@@ -156,8 +174,9 @@ html, body, #loading_container {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-
   background: #000;
+  
+  box-shadow: rgba(0,0,0, 0.5) 0px 0px 1px, rgba(0,0,0, 0.5) 0px 0px 8px, rgba(0,0,0, 0.3) 0px 0px 16px;
 }
 .lds-ellipsis-left div:nth-child(1) {
   left: 8px;
@@ -491,9 +510,70 @@ class Perlin {
 	width:78px;
 }
 
-#loading_desc {
+
+
+
+
+
+#pause_container {
+	text-shadow: 0 -1px 4px #FFF, 0 -2px 10px #ff0, 0 -18px 40px #F00;
+
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+	display:none;
+
+	position:absolute;
+	background: rgba(0,0,0, 0.7);
+	
+
+	background: radial-gradient(circle, rgba(0,0,0,0.4654236694677871) 0%, rgba(0,0,0,0.8939950980392157) 36%, rgba(0,0,0,1) 59%, rgba(0,0,0,1) 100%);
+
+	
+	background-size: 100% 100%;
+	background-position: 50% 50%;
+	
+	--animation: gradient 3s ease infinite;
+}
+
+@keyframes gradient {
+	0% {
+		background-size: 100% 100%;
+	}
+	50% {
+		background-size: 200% 200%;
+	}
+	100% {
+		background-size: 100% 100%;
+	}
+}
+
+
+#pause_container_inner {
+    display: table-cell;
+    margin: 0;
+    padding: 0;
+
+    text-align: center;
+    vertical-align: middle;
+}
+
+#pause_text {
+	font:40px verdana;
+	margin: auto;
+	color: #000;
+}
+
+#pause_desc {
 	font:12px verdana;
-	color:#000;
+	color: #000;
+}
+#pause_container .lds-ellipsis-left div {
+	--background: #FFF;
+}
+#pause_container .lds-ellipsis div {
+	--background: #FFF;
 }
 
 
@@ -508,6 +588,21 @@ class Perlin {
 <div id="loading_desc">Working...</div>
 
 </div></div>
+
+
+
+
+<div id="pause_container"><div id="pause_container_inner">
+<div id="pause_text">
+
+GAME PAUSED
+
+</div>
+<div id="pause_desc">Press ENTER to unpause</div>
+
+</div></div>
+
+
 
 
 <div id="gui">
@@ -550,12 +645,20 @@ class Perlin {
 
 
 var ortho = true;
+let camstyle = 1; // 1 = ortho, 0 = 3d
+if(!ortho){
+	camstyle = 0;
+}
 var smoothRender = 1;
+
+let game_paused = false;
+let game_paused_by_enter = false;
 
 var globalFilter = smoothRender ? THREE.LinearFilter : THREE.NearestFilter;
 
 	
 
+let loading_start_time = 0;
 
 
 var SHOW_WAVE_BG = false;
@@ -579,8 +682,11 @@ var planeFrameNumX = 0;
 // z-indexes for different layers of objects:
 // from furthest to nearest (in the order of rendering; first in this list = smallest number = first to render).
 //
-var ZIN = -200; // current z-index
 var ZINSTEP = 100;
+if(!ortho){
+	ZINSTEP = 1;
+}
+var ZIN = -ZINSTEP*2; // current z-index
 // create new Z-index value
 function NEWZIN(){
 	ZIN += ZINSTEP;
@@ -650,10 +756,6 @@ var Z_RAIN = NEWZIN(); // rain texture.
 
 
 
-
-if(ortho){
-	sizemulti = 0.1;
-}
 
 
 
@@ -1243,25 +1345,6 @@ let edgePadY = 3300;
 
 
 
-var playerSize = 100*sizemulti;
-
-
-var boostSpeed = 60*3;
-
-var boostGivingTime = 200;
-var boostGivingAmount = 20;
-var maxBoostAmount = 200;
-
-var bombGivingTime = 700;
-var bombGivingAmount = 1;
-var maxBombAmount = 300;
-
-var holeLineDist = 200;
-
-
-
-
-
 // state vars:
 var countdownTimeStart = -1;
 
@@ -1481,7 +1564,7 @@ function setSpeed(i, speed){
 	if(speed > 150) speed = 150;
 	
 	players[i].internal_speed = speed;
-	real_speed = Math.sqrt(speed*speed*5);
+	real_speed = Math.sqrt(speed*speed*5)/10;
 	players[i].speed = real_speed;
 }
 
@@ -1671,6 +1754,7 @@ var SOUNDS = {
 	// one-dimensional sounds only: no distance adjustments at all:
 	// must start with underscore.
 	_blip: [1,1,0,0.005078,0.532665,0.439482,0.614439,0,0,0,0,0,0.554557,0.53357,0,0,0,0,0,1,0,0,0,0,0.1068],
+	_blip2: [1,1,0,0.084824,0.429053,0.351,0.391,0,0,0,0,0,-0.355,0.455,0,0,0,0,0,1,0,0,0,0,0.081],
 	//_morse_beep_long: [1,1,0,0.431,0,0.177,0.529172,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0.1,0,0.1068],
 	//_morse_beep_long_failure: [1,1,-0.058058,0.431,-0.030879,0.196496,0.529172,0,-0.056779,-0.035681,0.049863,0.004714,0.005416,-0.007549,1,-0.05378,0.012392,-0.0199,-0.028047,1.040697,-0.011889,0.015896,0.116385,0.030281,0.1068],
 	//_morse_beep_short: [1,1,0,0.286,0,0.177,0.529172,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0.1,0,0.1068],
@@ -1678,8 +1762,66 @@ var SOUNDS = {
 
 
 
-function myPlayerPos(){
-	return players[myPlayer].mesh.position;
+
+
+
+function uint32_to_array(val){
+	let uint32val = (val >>> 0); // just in case convert to uint32
+	return [
+		uint32val & 255, 
+		(uint32val >> 8) & 255, 
+		(uint32val >> 16) & 255, 
+		(uint32val >> 24) & 255, 
+	];
+}
+
+function array_to_uint32(arr){
+	return (arr[0] | (arr[1] << 8) | (arr[2] << 16) | (arr[3] << 24)) >>> 0;
+}
+
+
+
+
+function download_all_sounds(){
+
+	function download(data, filename, type){
+		// binary: "application/octet-stream"
+		// text: "text/plain"
+		// png: "image/png"
+		var file = new Blob([data], {type: type});
+		if(window.navigator.msSaveOrOpenBlob){ // IE10+
+			window.navigator.msSaveOrOpenBlob(file, filename);
+		}else{ // Others
+			var a = document.createElement("a"), url = URL.createObjectURL(file);
+			a.href = url;
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			setTimeout(function(){
+				document.body.removeChild(a);
+				window.URL.revokeObjectURL(url);
+			}, 0);
+		}
+	}
+	
+	let plaindata = [];
+	
+	for(let soundName in CACHED_SOUND_EFFECTS){
+		let sound = CACHED_SOUND_EFFECTS[soundName].sound;
+		// store soundname length and soundname string:
+		let soundname_arr = uint32_to_array(soundName.length);
+		for(let i = 0; i < soundName.length; i++){
+			soundname_arr.push(soundName.charCodeAt(i));
+		}
+		plaindata = plaindata.concat(soundname_arr);
+
+		for(let i = 0; i < sound.length; i++){
+			let sound_data = sound[i].wav;
+			plaindata = plaindata.concat(uint32_to_array(sound_data.length).concat(sound_data));
+		}
+	}
+	
+	download(Uint8Array.from(plaindata), "cached_sounds.dat", "application/octet-stream");
 }
 
 
@@ -1688,10 +1830,31 @@ function myPlayerPos(){
 
 
 var CACHED_SOUND_EFFECTS = {};
-
 // max_sounds
-var MAX_SOUND_ALTS = 13;
 
+let sounds_detail = 2;
+var MAX_SOUND_ALTS; // good for without downloading sound caches.
+let param_step;
+let param_min_val;
+
+if(sounds_detail == 1){
+	MAX_SOUND_ALTS = 4; // good for dev mode.
+	param_step = 2.8;
+	param_min_val = 0.08;
+}else if(sounds_detail == 2){
+	MAX_SOUND_ALTS = 13; // good for without downloading sound caches.
+	param_step = 1.3;
+	param_min_val = 0.08;
+}else if(sounds_detail == 3){
+	MAX_SOUND_ALTS = 64;
+	param_step = 1.05;
+	param_min_val = 0.06;
+}
+
+
+
+
+// load_sounds loading sounds generating_sounds generating sounds
 function generate_sounds(){
 	let i = 1;
 	for(var soundName in SOUNDS) {
@@ -1701,6 +1864,9 @@ function generate_sounds(){
 			generate_sound_caches(soundName);
 		}
 	}
+	
+	console.log("CACHED_SOUND_EFFECTS");
+	console.log(CACHED_SOUND_EFFECTS);
 }
 
 
@@ -1737,9 +1903,8 @@ function generate_sound_caches(soundName){
 		max_sounds_gen = 1;
 	}
 	
-	let step = 1.3;
-	let min_val = 0.08;
-		
+	let step = (PARAMS['p_lpf_freq']-param_min_val)/MAX_SOUND_ALTS;
+	
 	for(let i = 0; i < max_sounds_gen; i++){
 		SOUND = new SoundEffect(PARAMS).generate();
 		if(typeof CACHED_SOUND_EFFECTS[soundName]['sound'] === "undefined"){
@@ -1748,8 +1913,9 @@ function generate_sound_caches(soundName){
 		CACHED_SOUND_EFFECTS[soundName]['sound'].push(SOUND);
 		CACHED_SOUND_EFFECTS[soundName]['params'] = PARAMS;
 	
-		PARAMS['p_lpf_freq'] /= step; // aka "cutoff frequency"
-		if(PARAMS['p_lpf_freq'] <= min_val) PARAMS['p_lpf_freq'] = min_val;
+		PARAMS['p_lpf_freq'] /= param_step; // aka "cutoff frequency"
+		//PARAMS['p_lpf_freq'] -= step;
+		if(PARAMS['p_lpf_freq'] <= param_min_val) PARAMS['p_lpf_freq'] = param_min_val;
 	}
 }
 
@@ -2039,7 +2205,9 @@ function load_units(units){
 
 function pre_init(){
 
-	set_loading_desc("Initializing");
+	loading_start_time = getTimeMillis();
+
+	console.log("GAME LOADING STARTED");
 
 
 	CANVAS_W = window.innerWidth;
@@ -3270,10 +3438,20 @@ function onWindowResize() {
 
 $(window).focus(function() {
     window_focus = true;
-	play_sound("_blip");
+	play_sound("_blip2");
+	if(!game_paused_by_enter){
+		game_paused = false;
+		game_paused_by_enter = false;
+		update_pause_screen();
+	}
 }).blur(function() {
     window_focus = false;
-	play_sound("_blip");
+	play_sound("_blip2");
+	if(!game_paused_by_enter){
+		game_paused = true;
+		game_paused_by_enter = false;
+		update_pause_screen();
+	}
 });
 
 
@@ -3347,10 +3525,35 @@ function post_init(){
 	
 	spawn_bombers();
 	
-			
+
 	if(mapinfo.hasOwnProperty("units")){
 		load_units(mapinfo.units);
 	}
+	
+	
+	
+	{
+		let db_version = 1;
+		let db;
+		const DBOpenRequest = window.indexedDB.open('test', db_version);
+
+		DBOpenRequest.onerror = (event) => {
+			console.log("error loading db");
+			console.log(event);
+		};
+
+		DBOpenRequest.onsuccess = (event) => {
+			console.log("loading db");
+			console.log(event);
+
+			// Store the result of opening the database in the db variable. This is used a lot below
+			db = DBOpenRequest.result;
+
+			console.log("db");
+			console.log(db);
+		};
+	}
+
 }
 
 
@@ -3391,6 +3594,8 @@ function game_loaded(){
 	console.log("game loaded... post initializating...");
 	post_init();
 
+	let game_loading_time = (getTimeMillis()-loading_start_time)/1000;
+	console.log("GAME LOADED IN "+game_loading_time.toFixed(3)+" seconds");
 	
 	return true;
 }
@@ -3592,6 +3797,9 @@ var rotatePlayer = 0;
 
 
 function render(renderFrame){
+	if(game_paused){
+		return;
+	}
 	frameNumber++;
 	frameTime = getTimeMillis();
 	
@@ -3681,7 +3889,7 @@ function render(renderFrame){
 			curplayer.speed_z = -helimaxspeed_z;
 		}
 		curplayer.angle = get_angle(0, 0, curplayer.speed_x, curplayer.speed_z);
-		curplayer.speed = get_dist_2d(0,0, curplayer.speed_x, curplayer.speed_z)*10;
+		curplayer.speed = get_dist_2d(0,0, curplayer.speed_x, curplayer.speed_z);
 	}else{
 		if(curplayer.type == TYPE_SOLDIER){
 		
@@ -3744,7 +3952,8 @@ function render(renderFrame){
 			let x = players[myPlayer].mesh.position.x;
 			let z = players[myPlayer].mesh.position.z;
 			let dire = new get_kxy_angle(players[myPlayer].angle);
-			let speed = 0.1*players[myPlayer].speed;
+			let speed = players[myPlayer].speed;
+
 			drop_bomb(players[myPlayer].owner, x, z, dire, speed);
 			prevBombTime = getTimeMillis();
 		}
@@ -4039,7 +4248,7 @@ function render(renderFrame){
 				if(frameTime - bomber.bombing_start_time < 2000){
 					if(frameTime - bomber.last_bomb_time > 250){
 						let dire = new get_kxy_angle(angle);
-						let speed = 0.1*bomber.kx;
+						let speed = bomber.kx;
 						drop_bomb(bomber.owner, bomber.x, bomber.z+33, dire, speed, true);
 						bomber.last_bomb_time = getTimeMillis();
 					}
@@ -4211,6 +4420,7 @@ function render(renderFrame){
 				startY = 3;
 				maxFrames = 24;
 			}
+			maxFrames = Math.round(maxFrames*1.3+1);
 			
 			if(frameNumber % 3 == 0){
 				visual.frame++;
@@ -4288,8 +4498,8 @@ function render(renderFrame){
 			}else{
 				let dire = new get_kxy_angle(player.angle);
 			
-				player.mesh.position.x += dire.x*player.speed*sizemulti;
-				player.mesh.position.z += dire.z*player.speed*sizemulti;
+				player.mesh.position.x += dire.x*player.speed;
+				player.mesh.position.z += dire.z*player.speed;
 				
 				if(dire.x < 0){
 					dir = -1;
@@ -4641,7 +4851,7 @@ function render(renderFrame){
 
 		{
 
-			let speedAdd = players[santaPlayer].speed/150;
+			let speedAdd = players[santaPlayer].speed/15;
 			santaFrameNumber += speedAdd;
 			
 			if(santaFrameNumber >= 22-1){
@@ -4672,7 +4882,7 @@ function render(renderFrame){
 			// TYPE_SOLDIER animation: soldier player animation:
 			let thisplayer = players[soldierPlayer];
 			
-			let speedAdd = thisplayer.speed/150;
+			let speedAdd = thisplayer.speed/15;
 			soldierFrameNum += speedAdd;
 			
 			let animation_name = 'stand_idle';
@@ -4704,10 +4914,29 @@ function render(renderFrame){
 
 
 
-	let camstyle = 10;
+
 
 	if(camstyle == 0){
-		camera.lookAt( scene.position );
+		let cpx = players[myPlayer].mesh.position.x;
+		let cpy = players[myPlayer].mesh.position.y;
+		let cpz = players[myPlayer].mesh.position.z; // originally +23 to make the view skewed so it is not straight up view.
+		
+		let offset_x = 0;
+		let offset_z = 0;
+		if(MOUSE_X != -1){
+			offset_x = (MOUSE_X-(CANVAS_W/2))*2;
+			offset_z = (MOUSE_Y-(CANVAS_H/2))*2;
+		}
+		camera.position.x = cpx+offset_x; // for some reason adjusting these will fuck camera rotation...
+		camera.position.y = cpy+500; // how far camera is from ground; can see only things under it.
+		camera.position.z = cpz+offset_z;
+		
+		//camera.lookAt( scene.position );
+		camera.lookAt(
+			cpx + offset_x, 
+			cpy, 
+			cpz + offset_z
+		);
 		cameraCube.rotation.copy( camera.rotation );
 	}else{
 		
@@ -4977,7 +5206,7 @@ function glow_at(x, z, type, size){
 	}else if(size == EXPLOSION_HUGE3){
 		mscale = 1*6;
 	}
-	mscale *= 2; // double the size relative to explosion size.
+	mscale *= 3; // double the size relative to explosion size.
 
 
 	let w = 128;
@@ -4994,9 +5223,9 @@ function glow_at(x, z, type, size){
 
 		let geometry = new THREE.PlaneGeometry(w, h);
 		let material = new THREE.MeshBasicMaterial({map: texture, color: 0x444444});
-		material.color.set(0x444444);
+		material.color.set(0x555555);
 		material.transparent = true;
-		//material.opacity = 0.1; // doesnt seem to affect at all with additive blending.
+		//material.opacity = 1; // fades out after it is created.
 		material.side = THREE.DoubleSide;
 		material.blending = THREE.AdditiveBlending;
 
@@ -5449,14 +5678,14 @@ function shoot_turret(turret, owner){
 		let shot_start_z = turret.z-17;
 		
 
-		// todo: fix speeds and remove sizemulti shit from code.
+
 		let bullet_speed = 20.1; // speed 1 = 1*0.1+20 (lol)
 		let max_frames_per_dist = 30*(max_dist*2)/bullet_speed; // double in case needed
 
 		// add prediction of player movement in the future:
 		let max_frames = Math.floor((dist/bullet_speed));
 		let dire = new get_kxy_angle(curplayer.angle);
-		let pspeed = curplayer.speed * sizemulti * max_frames;
+		let pspeed = curplayer.speed * max_frames;
 		let add_x = dire.x*pspeed;
 		let add_z = dire.z*pspeed;
 		target_x = curplayer.mesh.position.x + add_x;
@@ -5540,12 +5769,12 @@ function shoot_turret(turret, owner){
 function shoot_turret_from(owner, x, z, angle, type){
 	if(type == TURRET_ANTIAIR){
 		play_sound("antiair_gun", x, z);
-		shoot_planegun_nosound(owner, x, z, angle, 1);
+		shoot_planegun_nosound(owner, x, z, angle, 0.1);
 	}else if(type == TURRET_BOMBER){
 		play_sound("explosion_bullet", x, z);
 
 		let dire = new get_kxy_angle(angle);
-		let speed = 1*sizemulti+20;
+		let speed = 20;
 		
 		drop_bomb(owner, x, z, dire, speed);
 	}
@@ -5585,7 +5814,7 @@ function shoot_from_myplayer(){
 		let bullet_angle = curplayer.shoot_angle;
 		bullet_angle += (Math.random()-0.5)*shooting_imprecision;
 		let dire = new get_kxy_angle(bullet_angle);
-		let speed = object_speed*sizemulti+20;
+		let speed = object_speed+20;
 		
 		drop_bomb(players[myPlayer].owner, x, z, dire, speed);
 	}
@@ -5628,7 +5857,7 @@ function shoot_planegun_nosound(owner, x, z, bullet_angle, object_speed, type){
 	
 	bullet_angle += (Math.random()-0.5)*shooting_imprecision;
 	let dire = new get_kxy_angle(bullet_angle);
-	let speed = object_speed*sizemulti+20;
+	let speed = object_speed+20;
 
 	let shot = {
 		'x': x,
@@ -5690,140 +5919,160 @@ function onDocumentKeyUp(event) {
 // keys
 document.addEventListener("keydown", onDocumentKeyDown, false);
 function onDocumentKeyDown(event) {
-	KEYS[event.which] = true;
-	
 	var keyCode = event.which;
-	console.log("keydown = "+keyCode);
 	
-	
-	let curplayer = players[myPlayer];
-
-	if(keyCode == 66){ // 'B'
-		spawn_bombers();
+	if(!game_paused){
+		KEYS[event.which] = true;
 		
-	}else if(keyCode == 80){ // 'P'
-		// toggle turrets
-		turrets_enabled ^= 1;
-		//if(turrets_enabled){
-			for(let i = 0; i < turrets.length; i++){
-				respawn_turret(i);
+		console.log("keydown = "+keyCode);
+		
+		let curplayer = players[myPlayer];
+
+		if(keyCode == 113){
+			// download sounds sound data:
+			download_all_sounds();
+		}else if(keyCode == 66){ // 'B'
+			spawn_bombers();
+			
+		}else if(keyCode == 80){ // 'P'
+			// toggle turrets
+			turrets_enabled ^= 1;
+			//if(turrets_enabled){
+				for(let i = 0; i < turrets.length; i++){
+					respawn_turret(i);
+				}
+			//}
+			
+		}else if(keyCode == 69){ // 'E'
+			curplayer.lane++;
+			if(curplayer.lane > 1){
+				curplayer.lane = 1;
 			}
-		//}
+			
+		}else if(keyCode == 81){ // 'Q'
+			curplayer.lane--;
+			if(curplayer.lane < -1){
+				curplayer.lane = -1;
+			}
+			
+		}else if(keyCode == 82){
+			mapMesh.material.alphaTest += 0.1;
+			console.log(mapMesh.material.alphaTest);
+		}else if(keyCode == 70){
+			mapMesh.material.alphaTest -= 0.1;
+			console.log(mapMesh.material.alphaTest);
+		}else if(keyCode == 87){ // 'W'
+			// jump
+			
+			
+		}else if(keyCode == 83){ // 'S'
+			// prone
+			
+			
+		}else if(keyCode == 65){ // 'A'
+			// turn left
+			
+			//rotatePlayer = 2;
+			
+		}else if(keyCode == 68){ // 'D'
+			// turn right
+			
+			//rotatePlayer = -2;
+			
+		}else if(keyCode == 89){ // 'Y'
+			// youtube element
+			//var group = new THREE.Group();
+			//group.add(new YoutubeEmbed('bmfudW7rbG0', 0, Z_RAIN, 0, -Math.PI/2));
+			//scene2.add(group);
 		
-	}else if(keyCode == 69){ // 'E'
-		curplayer.lane++;
-		if(curplayer.lane > 1){
-			curplayer.lane = 1;
+		}else if(keyCode == 32){ // 'space	'
+
+			
+		}else if(keyCode == 115){ // 'F4'
+			if(guivisible){
+				$("#gui").hide();
+				//$("#sfxr_panel").hide();
+			}else{
+				$("#gui").show();
+				//$("#sfxr_panel").show();
+			}
+			guivisible ^= 1;
+			
+		}else if(keyCode == 49){ // '1'
+			change_player(keyCode-49);
+
+		}else if(keyCode == 50){ // '2'
+			change_player(keyCode-49);
+			
+		}else if(keyCode == 51){ // '3'
+			change_player(keyCode-49);
+			
+		}else if(keyCode == 52){ // '4'
+			change_player(keyCode-49);
+			
+		}else if(keyCode == 53){ // '5'
+			change_player(keyCode-49);
+			
+		}else if(keyCode == 54){ // '6'
+			change_player(keyCode-49);
+			
+		}else if(keyCode == 55){ // '7'
+			change_player(keyCode-49);
+			
+		}else if(keyCode == 56){ // '8'
+			change_player(keyCode-49);
+			
+		}else if(keyCode == 57){ // '9'
+			SHOW_RAIN_BG ^= 1;
+			
+			if(SHOW_RAIN_BG){
+				rainfallMesh.visible = true;
+				waterdropsMesh.visible = true;
+				fade_dir = 2; // enable
+			}else{
+				fade_dir = 1; // disable
+			}
+			
+		}else if(keyCode == 78){ // 'N'
+			SHOW_NIGHTSKY_BG ^= 1;
+			
+			// night_enabled night enabled
+			if(SHOW_NIGHTSKY_BG){
+				night_fade_dir = 2; // enable night
+				// todo: add textures/clouds/sunset.png for sunset night mode.
+				//scene.background = new THREE.Color(0xFFFF00); // add skybox. this simple!
+			}else{
+				//scene.background = nightskyImg; // add skybox. this simple!
+				skyboxMesh.visible = true;
+				night_fade_dir = 1; // disable night
+			}
+			
+		}else if(keyCode == 48){ // '0'
+			SHOW_WAVE_BG ^= 1;
+			
+			terrain.visible = !!SHOW_WAVE_BG;
+			
 		}
-		
-	}else if(keyCode == 81){ // 'Q'
-		curplayer.lane--;
-		if(curplayer.lane < -1){
-			curplayer.lane = -1;
-		}
-		
-	}else if(keyCode == 82){
-		mapMesh.material.alphaTest += 0.1;
-		console.log(mapMesh.material.alphaTest);
-	}else if(keyCode == 70){
-		mapMesh.material.alphaTest -= 0.1;
-		console.log(mapMesh.material.alphaTest);
-	}else if(keyCode == 87){ // 'W'
-		// jump
-		
-		
-	}else if(keyCode == 83){ // 'S'
-		// prone
-		
-		
-	}else if(keyCode == 65){ // 'A'
-		// turn left
-		
-		//rotatePlayer = 2;
-		
-	}else if(keyCode == 68){ // 'D'
-		// turn right
-		
-		//rotatePlayer = -2;
-		
-	}else if(keyCode == 89){ // 'Y'
-		// youtube element
-		//var group = new THREE.Group();
-		//group.add(new YoutubeEmbed('bmfudW7rbG0', 0, Z_RAIN, 0, -Math.PI/2));
-		//scene2.add(group);
+	} // !game_paused
 	
-	}else if(keyCode == 32){ // 'space	'
-
-		
-	}else if(keyCode == 115){ // 'F4'
-		if(guivisible){
-			$("#gui").hide();
-			//$("#sfxr_panel").hide();
-		}else{
-			$("#gui").show();
-			//$("#sfxr_panel").show();
+	// allow pause button to work at all times:
+	if(keyCode == 13){ // 'enter'
+		if(gameLoadedVar){
+			game_paused ^= 1;
+			game_paused_by_enter = game_paused;
+			play_sound("_blip");
+			update_pause_screen();
 		}
-		guivisible ^= 1;
-		
-	}else if(keyCode == 49){ // '1'
-		change_player(keyCode-49);
-
-	}else if(keyCode == 50){ // '2'
-		change_player(keyCode-49);
-		
-	}else if(keyCode == 51){ // '3'
-		change_player(keyCode-49);
-		
-	}else if(keyCode == 52){ // '4'
-		change_player(keyCode-49);
-		
-	}else if(keyCode == 53){ // '5'
-		change_player(keyCode-49);
-		
-	}else if(keyCode == 54){ // '6'
-		change_player(keyCode-49);
-		
-	}else if(keyCode == 55){ // '7'
-		change_player(keyCode-49);
-		
-	}else if(keyCode == 56){ // '8'
-		change_player(keyCode-49);
-		
-	}else if(keyCode == 57){ // '9'
-		SHOW_RAIN_BG ^= 1;
-		
-		if(SHOW_RAIN_BG){
-			rainfallMesh.visible = true;
-			waterdropsMesh.visible = true;
-			fade_dir = 2; // enable
-		}else{
-			fade_dir = 1; // disable
-		}
-		
-	}else if(keyCode == 78){ // 'N'
-		SHOW_NIGHTSKY_BG ^= 1;
-		
-		// night_enabled night enabled
-		if(SHOW_NIGHTSKY_BG){
-			night_fade_dir = 2; // enable night
-			// todo: add textures/clouds/sunset.png for sunset night mode.
-			//scene.background = new THREE.Color(0xFFFF00); // add skybox. this simple!
-		}else{
-			//scene.background = nightskyImg; // add skybox. this simple!
-			skyboxMesh.visible = true;
-			night_fade_dir = 1; // disable night
-		}
-		
-	}else if(keyCode == 48){ // '0'
-		SHOW_WAVE_BG ^= 1;
-		
-		terrain.visible = !!SHOW_WAVE_BG;
-		
-	}else if(keyCode == 13){ // 'enter'
-
 	}
 };
 
+function update_pause_screen(){
+	if(game_paused){
+		$("#pause_container").css("display", "table");
+	}else{
+		$("#pause_container").css("display", "none");
+	}
+}
 
 
 
@@ -5839,43 +6088,41 @@ $(window).bind('beforeunload', function(){
 // onmousemove
 document.addEventListener("mousemove", onDocumentMouseMove, false);
 function onDocumentMouseMove(event) {
-	var renderlayer = renderer.getSize();
-	var midX = renderlayer.width/2;
-	var midY = renderlayer.height/2;
-	var x = event.clientX;
-	var y = event.clientY;
-	// update mouse pos only if not pressing SHIFT key.
-	// NOTE: DONT USE CTRL IN ANY COMBINATIONS SINCE CTRL+W QUITS PAGE.
-	// this way you can stop camera following mouse.
-	// todo: fix pointing direction being wrong if player not in middle of screen.
-	if(!key_down(16)){ // 'SHIFT'
-		MOUSE_X = x;
-		MOUSE_Y = y;
-	}
-	
-	var angle = get_angle(midX, midY, x, y);
-	var dist = get_dist_2d(midX, midY, x, y);
-	var maxDistX = midX/1;
-	var maxDistY = midY/1;
-	var maxDist = maxDistX;
-	if(maxDistY < maxDistX){
-		maxDist = maxDistY;
-	}
-	if(dist > maxDist){
-		dist = maxDist;
-	}
-	var distPercent = dist/maxDist;
-	var maxSpeed = 80;
-	var minSpeed = 0;
-
-	
-	if(!players.length){
-		console.log("players not initialized yet");
-	}else{
-		//setAngle(myPlayer, angle);
-		//setSpeed(myPlayer, minSpeed+distPercent*maxSpeed);
-		setShootAngle(myPlayer, angle);
+	if(!game_paused){
+		var renderlayer = renderer.getSize();
+		var midX = renderlayer.width/2;
+		var midY = renderlayer.height/2;
+		var x = event.clientX;
+		var y = event.clientY;
+		// update mouse pos only if not pressing SHIFT key.
+		// NOTE: DONT USE CTRL IN ANY COMBINATIONS SINCE CTRL+W QUITS PAGE.
+		// this way you can stop camera following mouse.
+		// todo: fix pointing direction being wrong if player not in middle of screen.
+		if(!key_down(16)){ // 'SHIFT'
+			MOUSE_X = x;
+			MOUSE_Y = y;
+		}
 		
+		var angle = get_angle(midX, midY, x, y);
+		var dist = get_dist_2d(midX, midY, x, y);
+		var maxDistX = midX/1;
+		var maxDistY = midY/1;
+		var maxDist = maxDistX;
+		if(maxDistY < maxDistX){
+			maxDist = maxDistY;
+		}
+		if(dist > maxDist){
+			dist = maxDist;
+		}
+		var distPercent = dist/maxDist;
+		var maxSpeed = 80;
+		var minSpeed = 0;
+
+		if(!players.length){
+			console.log("players not initialized yet");
+		}else{
+			setShootAngle(myPlayer, angle);
+		}
 	}
 };
 
@@ -5884,37 +6131,39 @@ function onDocumentMouseMove(event) {
 
 document.addEventListener("mousedown", onDocumentMouseDown, false);
 function onDocumentMouseDown(event) {
-	if(event.button == 0){ // left click leftclick
-		if(players.length > 0){
-			shoot_from_myplayer();
-			prevShootTime = getTimeMillis();
-			shooting_started = true;
-			prevShootStartTime = getTimeMillis();
-		}
-	
-	}else if(event.button == 1){ // middle click
-		// change primary weapon:
-		if(players.length > 0){
-			players[myPlayer].current1++;
-			if(players[myPlayer].current1 >= players[myPlayer].weapons1.length){
-				players[myPlayer].current1 = 0;
+	if(!game_paused){
+		if(event.button == 0){ // left click leftclick
+			if(players.length > 0){
+				shoot_from_myplayer();
+				prevShootTime = getTimeMillis();
+				shooting_started = true;
+				prevShootStartTime = getTimeMillis();
 			}
-		}
 		
-	}else if(event.button == 2){ // right click
-		// flip plane:
-
-		if(players.length > 0){
-			if(players[myPlayer].type == TYPE_PLANE){
-				if(!flip_dir){
-					plane_flipped ^= 1;
-				
-					play_sound("plane_flip", players[myPlayer].mesh.position.x, players[myPlayer].mesh.position.z);
+		}else if(event.button == 1){ // middle click
+			// change primary weapon:
+			if(players.length > 0){
+				players[myPlayer].current1++;
+				if(players[myPlayer].current1 >= players[myPlayer].weapons1.length){
+					players[myPlayer].current1 = 0;
+				}
+			}
 			
-					//console.log("plane_flipped: "+(!!plane_flipped));
-							
-					flip_dir = 1;
+		}else if(event.button == 2){ // right click
+			// flip plane:
+
+			if(players.length > 0){
+				if(players[myPlayer].type == TYPE_PLANE){
+					if(!flip_dir){
+						plane_flipped ^= 1;
 					
+						play_sound("plane_flip", players[myPlayer].mesh.position.x, players[myPlayer].mesh.position.z);
+				
+						//console.log("plane_flipped: "+(!!plane_flipped));
+								
+						flip_dir = 1;
+						
+					}
 				}
 			}
 		}
@@ -5926,14 +6175,16 @@ function onDocumentMouseDown(event) {
 
 document.addEventListener("mouseup", onDocumentMouseUp, false);
 function onDocumentMouseUp(event) {
-	if(event.button == 0){ // left click
-		shooting_started = false;
-		can_shoot = false;
-	}else if(event.button == 1){ // middle click
-		
-	}else if(event.button == 2){ // right click
-		
-	}
+	//if(!game_paused){
+		if(event.button == 0){ // left click
+			shooting_started = false;
+			can_shoot = false;
+		}else if(event.button == 1){ // middle click
+			
+		}else if(event.button == 2){ // right click
+			
+		}
+	//}
 };
 
 
