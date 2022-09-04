@@ -665,11 +665,13 @@ var SHOW_WAVE_BG = false;
 var SHOW_RAIN_BG = false; // rain enabled/disabled
 var SHOW_MAP_BG = true;
 var SHOW_NIGHTSKY_BG = false;
+var NIGHTSKY_STYLE = 0; // 0 = night, 1 = sunset (bright yellow).
 var turrets_enabled = true;
 
 
 var fade_dir = 0;
-var night_fade_dir = 0;
+var night_fade_dir = 0; // 0 = night disabled.
+var skyopacity = 0; // 0 if day mode.
 
 var plane_flipped = false; // 0 = not upside down. 1 = upside down.
 var flip_dir = 0; // which direction animation is going. 0 = nowhere, 1 = to flip dir, 2 = to unflip dir.
@@ -1138,7 +1140,7 @@ let ambient_light = 1;
 
 let GRAVITY_CONSTANT = 0.1; // was 0.06
 let BUOYANCY_CONSTANT = 0.01; // force to player making him rise up from water.
-let AIR_RESISTANCE = 0.995; // kx multiplied by this on air.
+let AIR_RESISTANCE = 1;//0.995; // kx multiplied by this on air.
 let WATER_RESISTANCE = 0.97; // kx multiplied by this in water.
 
 
@@ -4645,55 +4647,80 @@ function render(renderFrame){
 		bgTexImg2.offset.y+=0.01*rainspeed;
 		
 		
-		// nightmode night_mode
+		// if night enabled: nightmode night_mode
 		if(night_fade_dir){
 		
 
-			if(night_fade_dir == 1){ // disable night
-			
-
-			
-				skyboxMesh.material.opacity += night_fade_speed;
-				if(skyboxMesh.material.opacity >= 1){
-					skyboxMesh.material.opacity = 1;
-				}
-				
-
-				
-				cloudsMesh.material.opacity += night_fade_speed;
-				if(cloudsMesh.material.opacity >= 1){
-					cloudsMesh.material.opacity = 1;
-					//cloudsMesh.visible = false;
-				}
-				
+			if(night_fade_dir == 1){
 				ambient_light += night_fade_speed;
 				if(ambient_light > max_ambient_light){
 					ambient_light = max_ambient_light;
 				}
-				
-			}else if(night_fade_dir == 2){ // enable night (remove skyboxMesh)
-				skyboxMesh.material.opacity -= night_fade_speed;
-				if(skyboxMesh.material.opacity <= 0){
-					skyboxMesh.material.opacity = 0;
-					skyboxMesh.visible = false;
-
-				}
-				
-				cloudsMesh.material.opacity -= night_fade_speed;
-				if(cloudsMesh.material.opacity <= min_cloud_opa){
-					cloudsMesh.material.opacity = min_cloud_opa;
-					//cloudsMesh.visible = false;
-				}
-				
+			}else if(night_fade_dir == 2){
 				ambient_light -= night_fade_speed;
 				if(ambient_light < min_ambient_light){
 					ambient_light = min_ambient_light;
 				}
 			}
+		
+			if(NIGHTSKY_STYLE == 0){
+				// black sky
+				
+				if(night_fade_dir == 1){
+					// disable night
+				
+					skyboxMesh.material.opacity += night_fade_speed;
+					if(skyboxMesh.material.opacity >= 1){
+						skyboxMesh.material.opacity = 1;
+					}
+					
+					cloudsMesh.material.opacity += night_fade_speed;
+					if(cloudsMesh.material.opacity >= 1){
+						cloudsMesh.material.opacity = 1;
+						//cloudsMesh.visible = false;
+					}
+					
+					
+					
+				}else if(night_fade_dir == 2){
+					// enable night (remove skyboxMesh)
+					
+					skyboxMesh.material.opacity -= night_fade_speed;
+					if(skyboxMesh.material.opacity <= 0){
+						skyboxMesh.material.opacity = 0;
+						skyboxMesh.visible = false;
+
+					}
+					
+					cloudsMesh.material.opacity -= night_fade_speed;
+					if(cloudsMesh.material.opacity <= min_cloud_opa){
+						cloudsMesh.material.opacity = min_cloud_opa;
+						//cloudsMesh.visible = false;
+					}
+					
+				}
+				ambient.color.r = ambient_light;
+				ambient.color.g = ambient_light;
+				ambient.color.b = ambient_light;
 			
-			ambient.color.r = ambient_light;
-			ambient.color.g = ambient_light;
-			ambient.color.b = ambient_light;
+			}else if(NIGHTSKY_STYLE == 1){
+				// yellow sky
+				// todo fix:
+				if(night_fade_dir == 1){
+					skyopacity += night_fade_speed;
+					if(skyopacity > 1) skyopacity = 1;
+				}else if(night_fade_dir == 2){
+					skyopacity -= night_fade_speed;
+					if(skyopacity < 0) skyopacity = 0;
+				}
+				ambient.color.r = ambient_light;
+				ambient.color.g = ambient_light;
+				ambient.color.b = ambient_light;
+				cloudsMesh.material.color.set(colorBetweenRGBA(0xFFFFFF, 0xFFFF00, skyopacity));
+				skyboxMesh.material.color.set(colorBetweenRGBA(0xFFFFFF, 0xFFFF00, skyopacity));
+			}
+			
+
 		
 			
 			let waterFadePercent = 1-skyboxMesh.material.opacity; // 1 = day, 0 = night
@@ -5652,6 +5679,73 @@ function drop_bomb(owner, x, z, dire, speed, owned_by_ai){
 	scene.add(bombs[bombs.length-1].mesh);
 }
 
+function todeg(rad){
+	return 180-rad*(180.0/Math.PI);
+}
+
+
+function get_angles_for_target(x0, y0, x1, y1, v){
+	let delta_x = x1 - x0;
+	let delta_y = y1 - y0;
+	if(delta_x == 0){
+		if(delta_y > 0){
+			return [todeg(-Math.PI/2), null];
+		}else{
+			return [todeg(Math.PI/2), null];
+		}
+	}
+	let k = delta_y/delta_x;
+
+	let c = (k - 2*GRAVITY_CONSTANT*delta_x/(2*v*v))/Math.sqrt(1+k*k);
+	let alpha = Math.atan(-k);
+	let beta = Math.asin(c);
+
+	let theta_1 = 0.5*(beta - alpha);
+	let theta_2 = 0.5*(-beta + Math.PI - alpha);
+	
+	let solutions = [theta_1-Math.PI, theta_2-Math.PI, theta_1, theta_2];
+		
+	let min_t = 666666.0;
+	let min_theta = null;
+	let max_theta = null;
+	
+	let ts = [];
+
+	for(let i = 0; i < 4; i++){
+		let theta = solutions[i];
+		let t = delta_x/(Math.cos(theta)*v);
+		/*if(t > 0 && t < min_t){
+			min_t = t;
+			min_theta = theta;
+		}*/
+		
+		if(t > 0){
+			ts.push([t, theta]);
+		}
+	}
+	
+	if(ts.length == 1){
+		min_theta = ts[0][1];
+	}else if(ts.length == 2){
+		if(ts[0][0] > ts[1][0]){
+			min_theta = ts[1][1];
+			max_theta = ts[0][1];
+		}else{
+			min_theta = ts[0][1];
+			max_theta = ts[1][1];
+		}
+	}
+
+	let min_a = (min_theta !== null) ? todeg(min_theta) : null;
+	let max_a = (max_theta !== null) ? todeg(max_theta) : null;
+	
+	return [min_a, max_a];
+}
+
+
+
+
+
 
 
 
@@ -5677,8 +5771,6 @@ function shoot_turret(turret, owner){
 		let shot_start_x = turret.x;
 		let shot_start_z = turret.z-17;
 		
-
-
 		let bullet_speed = 20.1; // speed 1 = 1*0.1+20 (lol)
 		let max_frames_per_dist = 30*(max_dist*2)/bullet_speed; // double in case needed
 
@@ -5688,10 +5780,13 @@ function shoot_turret(turret, owner){
 		let pspeed = curplayer.speed * max_frames;
 		let add_x = dire.x*pspeed;
 		let add_z = dire.z*pspeed;
-		target_x = curplayer.mesh.position.x + add_x;
-		target_z = curplayer.mesh.position.z + add_z;
+		//target_x = curplayer.mesh.position.x + add_x;
+		//target_z = curplayer.mesh.position.z + add_z;
 		
+		target_x = curplayer.mesh.position.x;
+		target_z = curplayer.mesh.position.z;
 		
+		/*
 		
 		let targeting_angle = get_angle(shot_start_x, shot_start_z, target_x, target_z);
 
@@ -5748,16 +5843,79 @@ function shoot_turret(turret, owner){
 			
 			//console.log("total_grounds_found = "+total_grounds_found);
 		}
+		*/
 		
 
+		target_x += add_x;
+		target_z += add_z;
 		
-		if(found_target){
+		let best_angles = get_angles_for_target(shot_start_x, shot_start_z, target_x, target_z, bullet_speed);
+		let found_angle = null;
+		
+		for(let p = 0; p < best_angles.length; p++){
+			let cur_angle = best_angles[p];
+			if(cur_angle !== null){
+
+				let dire_bullet = new get_kxy_angle(cur_angle);
+				
+				let shot = {
+					'x': shot_start_x,
+					'z': shot_start_z,
+					'kx': dire_bullet.x*bullet_speed,
+					'kz': dire_bullet.z*bullet_speed,
+				};
+							
+				// simulate bullet movement:
+				let hit_ground = false;
+				let maxframes = 60*10; // 10 secs max calculation.
+				let prev_shot_dist = null;
+				let prev_shot_dist_diff = 0;
+				for(let i = 0; i < maxframes; i++){
+					shot.x += shot.kx;
+					shot.z += shot.kz;
+					shot.kx *= AIR_RESISTANCE;
+					shot.kz += GRAVITY_CONSTANT;
+					
+					let shot_dist = get_dist_2d(shot.x, shot.z, target_x, target_z);
+					
+					if(prev_shot_dist !== null){
+						let shot_dist_diff = shot_dist-prev_shot_dist;
+						if(shot_dist_diff-prev_shot_dist_diff > 0){
+							// todo: clean up code.
+							break; // bullet started to get further from target.
+						}
+						
+						prev_shot_dist_diff = shot_dist_diff;
+						
+						
+					}
+
+					if(is_ground(shot.x, shot.z)){
+						console.log("cur_angle = "+cur_angle.toFixed(2)+" hits ground");
+						hit_ground = true;
+						break;
+					}
+					
+					prev_shot_dist = shot_dist;
+				}
+				if(!hit_ground){
+					// found a way which didnt hit ground; use it:
+					found_angle = cur_angle;
+					break;
+				}
+			}
+		}
+		
+		
+		console.log("found_angle = "+found_angle);
+		
+		if(found_angle !== null){
 			
 			//console.log("max_frames = "+max_frames+", frames_used = "+frames_used);
 			
-			let random_spread = (Math.random()-0.5)*1.5; //1.5 degree spread.
-			let shot_angle = best_angle + random_spread;
-			
+			let random_spread = 0;//(Math.random()-0.5)*1.5; //1.5 degree spread.
+			let shot_angle = found_angle + random_spread;
+		
 			
 			shoot_turret_from(owner, shot_start_x, shot_start_z, shot_angle, turret.type);
 			//console.log("shoot turret from "+owner);
@@ -6035,6 +6193,7 @@ function onDocumentKeyDown(event) {
 			
 		}else if(keyCode == 78){ // 'N'
 			SHOW_NIGHTSKY_BG ^= 1;
+			NIGHTSKY_STYLE = 0;
 			
 			// night_enabled night enabled
 			if(SHOW_NIGHTSKY_BG){
@@ -6047,6 +6206,22 @@ function onDocumentKeyDown(event) {
 				night_fade_dir = 1; // disable night
 			}
 			
+		}else if(keyCode == 77){ // 'M'
+			//change mode to sunset
+			SHOW_NIGHTSKY_BG ^= 1;
+			NIGHTSKY_STYLE = 1;
+			
+			// sunset enable sunset
+			if(SHOW_NIGHTSKY_BG){
+				night_fade_dir = 2; // enable night
+				// todo: add textures/clouds/sunset.png for sunset night mode.
+				//scene.background = new THREE.Color(0xFFFF00); // add skybox. this simple!
+			}else{
+				//scene.background = nightskyImg; // add skybox. this simple!
+				skyboxMesh.visible = true;
+				night_fade_dir = 1; // disable night
+			}
+		
 		}else if(keyCode == 48){ // '0'
 			SHOW_WAVE_BG ^= 1;
 			
