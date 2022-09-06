@@ -1,8 +1,8 @@
 # md
 Master Defender
 
-Web browser based 2d game mixing triplane, soldat, clonk planet, contra, etc. together.
+Web browser based 2d game mixing Triplane Turmoil, Soldat, Clonk Planet, Liero, Worms, Contra, together.
 
-email: spindoctorator@gmail.com
+Email: spindoctorator@gmail.com
 
-do not copy/publish alterations without permission.
+Do not copy/publish/share game/alterations without permission.
