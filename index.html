@@ -341,17 +341,7 @@ body {
 #gui {
 	display:none;
 }
-#timer {
-	display:none;
-	position:absolute;
-	top:0;
-	left:0;
-	font:2vmax courier;
-	padding:10px 10px 10px 20px;
-	background-color:rgba(0,0,0, 0.5);
-	text-shadow: 0 0 3px #000000, 0 0 2px #000000, 0 0 1px #000000;
-	border-bottom-right-radius:10px;
-}
+
 #fps {
 	position:absolute;
 	top:0;
@@ -607,9 +597,6 @@ GAME PAUSED
 
 <div id="gui">
 
-	<div id="timer">
-	</div>
-
 	<div id="fps">
 	FPS: 0
 	</div>
@@ -695,7 +682,7 @@ function NEWZIN(){
 	return ZIN-ZINSTEP;
 }
 
-var Z_SKYBOX = NEWZIN(); // the most furthest clouds (skybox).
+var Z_SKYBOX = NEWZIN(); // night sky (skybox).
 
 var Z_CLOUDS = NEWZIN(); // clouds parallax
 
@@ -712,6 +699,8 @@ var Z_MAP_BG = NEWZIN(); // map texture (back layer / map background parallax).
 var Z_MAP_BEHIND = NEWZIN(); // map sprites layer
 
 var Z_MAP_BEHIND_FRONT = NEWZIN(); // on front of the behind items.
+
+var Z_TURRET_BARREL = NEWZIN();
 
 var Z_TURRET = NEWZIN(); //  turrets behind every other object.
 
@@ -749,6 +738,8 @@ var Z_MAP_SPLASHES = NEWZIN();
 
 var Z_MAP_VISUALS = NEWZIN(); // explosion glows etc.
 
+
+var Z_PORTAL = NEWZIN();
 
 
 var Z_RAIN = NEWZIN(); // rain texture.
@@ -1140,9 +1131,11 @@ let ambient_light = 1;
 
 let GRAVITY_CONSTANT = 0.1; // was 0.06
 let BUOYANCY_CONSTANT = 0.01; // force to player making him rise up from water.
+// todo: shot prediction does not work with air resistance yet.
 let AIR_RESISTANCE = 1;//0.995; // kx multiplied by this on air.
 let WATER_RESISTANCE = 0.97; // kx multiplied by this in water.
 
+let MAX_TARGET_DISTANCE = 1200; // how far turrets can shoot by default.
 
 let MAX_TEX_SIZE = 1024; // will be initialized at pre_init
 
@@ -1327,7 +1320,7 @@ var crystalCount = 80;
 var defaultBoostTime = 1000000; // for players.
 
 
-var framesPerFps = 20;
+var framesPerFps = 20; // interval of frames how often fps is updated.
 
 var mapsize = 10000;
 var terrainVerts = 128;
@@ -1375,7 +1368,7 @@ var turrets = []; // can be antiair or regular turret.
 var visuals = []; // glow sprites etc... works same way as explosions basically.
 
 
-var frameNumber = 0;
+
 var prevFpsTime = 0;
 
 var ambient;
@@ -1541,9 +1534,7 @@ function updateScoreTable(){
 }
 
 
-function updateBoostCount(){
-	$('#boost-count').html(players[myPlayer].boostTime);
-}
+
 function updateInfo(){
 	let curplayer = players[myPlayer];
 	let xpos = Math.round(curplayer.mesh.position.x*10)/10;
@@ -1617,26 +1608,11 @@ function getGameTimeLeft(){
 	return retval;
 }
 
-function updateTimer(){
-	if(!gameEnded){
-		$('#timer').html("Gotta catch 'em all!");
-	}else{
-		var winnerName = players[gameWinnerIndex].nick;
-		$('#timer').html(""+winnerName+" has won the game!");
-		
-		var countdowntime = countdownTimeMax-((getTimeMillis()-countdownTimeStart)/1000.0);
-		if(countdowntime < 0){
-			countdowntime = 0;
-			restartGame();
-		}
-		$('#countdown').html("Next round starts in "+countdowntime.toFixed(1)+"s");
-	}
-}
+
 
 function initTimer(){
 	gameStartTime = getTimeMillis();
 	prevFpsTime = getTimeMillis();
-	updateTimer();
 }
 
 function init_gui(){
@@ -1644,7 +1620,6 @@ function init_gui(){
 	set_loading_desc("Initializing GUI");
 	
 	updateScoreTable();
-	updateTimer();
 }
 
 
@@ -1832,9 +1807,9 @@ function download_all_sounds(){
 
 
 var CACHED_SOUND_EFFECTS = {};
-// max_sounds
+// max_sounds max sounds
 
-let sounds_detail = 2;
+let sounds_detail = 1;
 var MAX_SOUND_ALTS; // good for without downloading sound caches.
 let param_step;
 let param_min_val;
@@ -2205,6 +2180,14 @@ function load_units(units){
 
 
 
+function show_texture_loading_warning(err){
+	console.warn("Could not load texture: \""+err.path[0].currentSrc+"\", ignoring it.");
+}
+
+
+
+
+
 function pre_init(){
 
 	loading_start_time = getTimeMillis();
@@ -2228,7 +2211,7 @@ function pre_init(){
 		// combine map_defaults with map settings.json:
 		mapinfo = Object.assign(map_defaults, json);
 	}).fail(function(){
-		console.log("ERROR: Could not read file: '"+map_data_url+"'! File may be missing or incorrectly formatted (JSON is strict format, commas cannot be in end of lines unless another item comes after. All keys must be surrounded by double quotes, and all strings must be surrounded by double quotes).");
+		console.error("ERROR: Could not read file: '"+map_data_url+"'! File may be missing or incorrectly formatted (JSON is strict format, commas cannot be in end of lines unless another item comes after. All keys must be surrounded by double quotes, and all strings must be surrounded by double quotes).");
 	});
 	
 	
@@ -2455,7 +2438,7 @@ function pre_init(){
 			behindEmissiveTex.magFilter = globalFilter;
 		}, null, function(err){
 			loaded.map_behind_lights = true;
-			console.log("error loading texture: "+err.path.baseURI);
+			show_texture_loading_warning(err);
 		});
 		
 		
@@ -2492,7 +2475,7 @@ function pre_init(){
 			}
 		}, null, function(err){
 			loaded.map_behind = true;
-			console.log("error loading texture: "+err.path.baseURI);
+			show_texture_loading_warning(err);
 		});
 		
 		
@@ -2526,8 +2509,9 @@ function pre_init(){
 			}
 		}, null, function(err){
 			loaded.map_front = true;
-			console.log("error loading texture: "+err.path.baseURI);
+			show_texture_loading_warning(err);
 		});
+
 
 		
 		
@@ -2560,7 +2544,7 @@ function pre_init(){
 			}
 		}, null, function(err){
 			loaded.map_bg = true;
-			console.log("error loading texture: "+err.path.baseURI);
+			show_texture_loading_warning(err);
 		});
 		
 		
@@ -2661,7 +2645,7 @@ function pre_init(){
 			bgTexClouds.wrapT = THREE.RepeatWrapping;
 
 			{
-				let geometry = new THREE.PlaneGeometry(maptex_w*4, maptex_h*20);
+				let geometry = new THREE.PlaneGeometry(maptex_w*4, maptex_h*20, 1, 20);
 				let material = new THREE.MeshPhongMaterial({map: bgTexClouds, color: cloudsColor});
 				material.transparent = true;
 				material.opacity = 0.9;
@@ -2684,8 +2668,75 @@ function pre_init(){
 				
 			}
 		});
+		/*
+function create_fading_mesh(){
+
+		var geometry = new THREE.PlaneBufferGeometry( mapsize, mapsize, terrainVerts, terrainVerts );
+		var count = geometry.attributes.position.count;
+		geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(count*3), 3));
 		
+		terrain = new THREE.Mesh(geometry, mapMaterial);
+		terrain.visible = SHOW_WAVE_BG;
+		terrain.rotation.x = -Math.PI / 2;
 		
+
+		var peak = 8;
+		var smoothing = 600;
+		var vertices = terrain.geometry.attributes.position.array;
+		var perlin = new Perlin();
+		for(var i = 0; i <= vertices.length; i += 3){
+			vertices[i+2] = peak * perlin.noise(
+				(terrain.position.x + vertices[i+0])/smoothing, 
+				(terrain.position.z + vertices[i+1])/smoothing
+			);
+		}
+		terrain.geometry.attributes.position.needsUpdate = true;
+		terrain.geometry.computeVertexNormals();
+		
+		// flatten the terrain:
+		vertices = terrain.geometry.attributes.position.array;
+		var colors = terrain.geometry.attributes.color.array;
+		for(var i = 0, c = 0; i <= vertices.length; i += 3, c+=3){
+			vertices[i+2] = Z_SKYBOX+5;
+		
+			// default color to white:
+			colors[c+0] = 1.16;//1.2+(Math.random())*0.5;//Math.random()*3;
+			colors[c+1] = 1.16;//1.2+(Math.random())*0.5;//Math.random()*3;
+			colors[c+2] = 1.10;//1.2+(Math.random())*0.5;
+			
+			// stretch edge + fade to black:
+			if(vertices[i+0] <= -mapsize/2){
+				vertices[i+0] = -mapsize;
+				colors[c+0] = 0;
+				colors[c+1] = 0;
+				colors[c+2] = 0;
+			}
+			if(vertices[i+0] >= mapsize/2){
+				vertices[i+0] = mapsize;
+				colors[c+0] = 0;
+				colors[c+1] = 0;
+				colors[c+2] = 0;
+			}
+			if(vertices[i+1] <= -mapsize/2){
+				vertices[i+1] = -mapsize;
+				colors[c+0] = 0;
+				colors[c+1] = 0;
+				colors[c+2] = 0;
+			}
+			if(vertices[i+1] >= mapsize/2){
+				vertices[i+1] = mapsize;
+				colors[c+0] = 0;
+				colors[c+1] = 0;
+				colors[c+2] = 0;
+			}
+		}
+		terrain.geometry.attributes.position.needsUpdate = true;
+		//console.log("terrain.geometry.attributes");
+		//console.log(terrain.geometry.attributes);
+		//terrain.geometry.attributes.color.needsUpdate = true;
+		
+}
+		*/
 		
 
 		// load rain rainfall:
@@ -3240,13 +3291,12 @@ function pre_init(){
 			
 			let mesh = new THREE.Mesh(geometry, material);
 			let mscale = 1;
-			mesh.position.x = 625;
+			mesh.position.x = 1884;
 			mesh.position.y = Z_PLANE;
-			mesh.position.z = -589;
-			
+			mesh.position.z = -186;
+
 			mesh.rotation.x = -Math.PI/2;
 			mesh.scale.set(mscale,mscale,mscale);
-			
 		
 			var i = add_player(mesh, TYPE_PLANE);
 			change_player(i);
@@ -3466,44 +3516,8 @@ function animate() {
 
 
 
-function restartGame(){
-	console.log("restarting game...");
-	hideEndingScores();
-	resetVars();
-	updateScoreTable();
-}
 
-function checkGameState(){
-	if(getGameTimeLeft() <= 0){
-		gameEnding = true;
-	}
-}
 
-function switchGameState(newState){
-	if(prevEndingState === newState){
-		return; // do nothing if state doesnt change.
-	}
-	
-	gameEnding = newState;
-	
-	var offsetY = 0;
-	if(gameEnding){
-		offsetY = 0;
-	}else{
-		offsetY = -100;
-	}
-
-	
-	prevEndingState = newState;
-	console.log("state changed to: "+newState);
-	if(newState === true){
-		gameStartTime = getTimeMillis();
-		updateTimer();
-	}else{
-		gameStartTime = -1;
-		updateTimer();
-	}
-}
 
 
 
@@ -3522,6 +3536,134 @@ function updateFPS(){
 
 
 
+
+// returns null if no intersection.
+// returns [x,y] if intersects.
+function line_intersect_line(x1, y1, x2, y2, x3, y3, x4, y4) {
+	if ((x1 === x2 && y1 === y2) || (x3 === x4 && y3 === y4)){ // Check if none of the lines are of length 0
+		return null;
+	}
+	denominator = ((y4-y3)*(x2-x1)-(x4-x3)*(y2-y1));	
+	if(denominator === 0){ // Lines are parallel
+		return null;
+	}
+	let ua = ((x4-x3)*(y1-y3)-(y4-y3)*(x1-x3)) / denominator;
+	let ub = ((x2-x1)*(y1-y3)-(y2-y1)*(x1-x3)) / denominator;
+	if(ua < 0 || ua > 1 || ub < 0 || ub > 1){ // is the intersection along the segments
+		return null;
+	}
+	// Return a object with the x and y coordinates of the intersection
+	return [x1+ua*(x2-x1), y1+ua*(y2-y1)];
+}
+
+
+
+
+let portals = [];
+
+
+/*
+	spawn_portal({
+		'size': 200.0,
+		'shape': 1, // 0 = circle, 1 = line. todo: use ellipse
+		'unidirectional': true, // can the object go in from both ends.
+		'preserve_position': true, // does object come out of other end at same relative position to portal it came in it?
+		'preserve_angle': true, // is the incoming object rotated to the outgoing portal angle?
+		'points' = [
+			{ // startpoint
+				'x': 327,
+				'y': -770,
+				'angle': 126.0,
+			},
+			{ // endpoint
+				'x': 211,
+				'y': -51,
+				'angle': 256.0,
+			},
+		],
+*/
+
+// todo: process portals.
+function spawn_portal(portal){
+
+	for(let i = 0; i < 2; i++){
+		let x = portal.points[i].x;
+		let z = portal.points[i].y;
+		let angle = portal.points[i].angle;
+
+		let foundIndex = -1; // todo: add find_free_portal() later
+		
+		let mesh;
+		
+		if(foundIndex == -1){
+			// create size of 1 and then scale it to correct size, so translate works easier.
+			let geometry = new THREE.PlaneGeometry(1, 1);
+			let material = new THREE.MeshPhongMaterial();
+			material.color.set(0xFF00FF);
+			material.transparent = false;
+			material.opacity = 0.7;
+			material.side = THREE.DoubleSide;
+			
+			//geometry.translate(0, 0, 0);
+			mesh = new THREE.Mesh(geometry, material);
+			
+			mesh.scale.set(5, portal.size, 1);
+			
+		}else{
+			mesh = portal.points[i].mesh;
+			mesh.visible = true;
+			mesh.material.color.set(0xFFFFFF); // needed if the unit has "hit flash" effect (red).
+		}
+
+		mesh.rotation.x = Math.PI/2;
+		mesh.rotation.z = (180-angle)*(Math.PI/180.0);
+
+		mesh.position.x = x;
+		mesh.position.y = Z_PORTAL;
+		mesh.position.z = z;
+
+		
+		// if was new portal, update mesh/texture too, and add to array/scene:
+		if(foundIndex == -1){
+			portal.points[i]['mesh'] = mesh;
+			
+			scene.add(mesh);
+		}
+	}
+	
+	portals.push(portal);
+	
+}
+
+
+
+function spawn_portals(){
+	spawn_portal({
+		'size': 200.0,
+		'shape': 1, // 0 = circle, 1 = line. todo: use ellipse
+		'unidirectional': true, // can the object go in from both ends.
+		'preserve_position': true, // does object come out of other end at same relative position to portal it came in it?
+		'preserve_angle': true, // is the incoming object rotated to the outgoing portal angle?
+		'points': [
+			{ // startpoint
+				'x': 327,
+				'y': -770,
+				'angle': 126.0,
+			},
+			{ // endpoint
+				'x': 211,
+				'y': -51,
+				'angle': 256.0,
+			},
+		],
+	});
+}
+
+
+
+
+
+
 function post_init(){
 	generate_sounds();
 	
@@ -3532,6 +3674,8 @@ function post_init(){
 		load_units(mapinfo.units);
 	}
 	
+	spawn_portals();
+	
 	
 	
 	{
@@ -3540,8 +3684,8 @@ function post_init(){
 		const DBOpenRequest = window.indexedDB.open('test', db_version);
 
 		DBOpenRequest.onerror = (event) => {
-			console.log("error loading db");
-			console.log(event);
+			console.warn("error loading db");
+			console.warn(event);
 		};
 
 		DBOpenRequest.onsuccess = (event) => {
@@ -3713,7 +3857,7 @@ function explode_turret(turretHit, explosion_type){
 		//turret.explode_time = getTimeMillis();
 		
 		turret.alive = false;
-		//turret.mesh.visible = false;
+		turret.barrel_mesh.visible = false; // hide barrel once blown up.
 		
 		play_sound("explosion_bomb", turret.x, turret.z);
 		explode_at(turret.x, turret.z, explosion_type, EXPLOSION_LARGE);
@@ -3724,6 +3868,7 @@ function respawn_turret(turretIndex){
 	let turret = turrets[turretIndex];
 	turret.health = 400;
 	turret.alive = true;
+	turret.barrel_mesh.visible = true;
 	
 	let framename = turret_type_to_idleframe(turret.type);
 	let pos = frame_offset('turret', framename, 0);
@@ -3789,10 +3934,20 @@ var shooting_started = false;
 var can_shoot = false;
 
 var shooting_imprecision = 0.5; // in degrees.
-var frameTime = 0;
-
+var frameTime_val = getTimeMillis();
+var frameNumber_val = 0;
 
 var rotatePlayer = 0;
+
+function frameTime(){
+	return frameTime_val;
+}
+function frameNumber(){
+	return frameNumber_val;
+}
+
+
+
 
 
 
@@ -3802,13 +3957,10 @@ function render(renderFrame){
 	if(game_paused){
 		return;
 	}
-	frameNumber++;
-	frameTime = getTimeMillis();
+	frameNumber_val++;
+	frameTime_val = getTimeMillis();
 	
-	if((frameNumber % framesPerFps) == 0){
-		updateFPS();
-	}
-	
+
 	if(!game_loaded()){
 		return;
 	}else{
@@ -3818,30 +3970,20 @@ function render(renderFrame){
 		}
 	}
 	
-	
-	//checkGameState();
-
-
-
-	if((frameNumber % 3) == 0){
-		updateBoostCount();
-		updateInfo();
-		updateTimer();
+	if((frameNumber_val % framesPerFps) == 0){
+		updateFPS();
 	}
 	
+	if(guivisible){
+		if((frameNumber_val % 5) == 0){
+			updateInfo();
+		}
+	}
 	
+	let curplayer = players[myPlayer];
+		
 
-	/*
-	// bright day:
-	ambient.color.r = 1.2;
-	ambient.color.g = 1.2;
-	ambient.color.b = 1.4;
-	
-	// night:
-	ambient.color.r = 0.2;
-	ambient.color.g = 0.2;
-	ambient.color.b = 0.2;
-	*/
+
 	
 
 	if(shooting_started){
@@ -3858,8 +4000,7 @@ function render(renderFrame){
 		}
 	}
 	
-	let curplayer = players[myPlayer];
-		
+
 
 	
 	if(curplayer.type == TYPE_HELI){
@@ -4164,16 +4305,24 @@ function render(renderFrame){
 			if(turret.alive){
 				let can_shoot = false;
 				if(turret.type == TURRET_ANTIAIR){
-					if(frameNumber % 10 == 0){
+					if(frameTime()-turret.shoot_start > 150+randiff(20)){
 						can_shoot = true;
 					}
 				}else if(turret.type == TURRET_BOMBER){
-					if(frameNumber % 90 == 0){
+					if(frameTime()-turret.shoot_start > 3000+randiff(200)){
 						can_shoot = true;
 					}
 				}
-				if(can_shoot){
-					shoot_turret(turret, OWNER_AI);
+				
+				//let curplayer = players[myPlayer];
+				
+				let target_x = curplayer.mesh.position.x;
+				let target_z = curplayer.mesh.position.z;
+				
+				let dist = get_dist_2d(turret.x, turret.z, target_x, target_z);
+				
+				if(dist < turret.max_shoot_dist){
+					shoot_turret(turret, OWNER_AI, can_shoot);
 				}
 			}
 		} // turrets
@@ -4247,12 +4396,12 @@ function render(renderFrame){
 			
 
 			if(bomber.bombing_start_time != -1){
-				if(frameTime - bomber.bombing_start_time < 2000){
-					if(frameTime - bomber.last_bomb_time > 250){
+				if(frameTime() - bomber.bombing_start_time < 2000){
+					if(frameTime() - bomber.last_bomb_time > 250){
 						let dire = new get_kxy_angle(angle);
 						let speed = bomber.kx;
 						drop_bomb(bomber.owner, bomber.x, bomber.z+33, dire, speed, true);
-						bomber.last_bomb_time = getTimeMillis();
+						bomber.last_bomb_time = frameTime();
 					}
 				}else{
 					bomber.bombing_start_time = -1;
@@ -4260,7 +4409,7 @@ function render(renderFrame){
 				}
 			}else{
 				if(Math.random() < 0.002){
-					bomber.bombing_start_time = getTimeMillis();
+					bomber.bombing_start_time = frameTime();
 					bomber.last_bomb_time = -1;
 				}
 			}
@@ -4270,7 +4419,7 @@ function render(renderFrame){
 			bomber.mesh.position.z = bomber.z;
 
 
-			if(frameNumber % 3 == 0){
+			if(frameNumber() % 3 == 0){
 				bomber.frame++;
 			}
 			if(bomber.frame > maxFrames-1){
@@ -4285,7 +4434,7 @@ function render(renderFrame){
 			
 			if(bomber.hit_time != -1){
 				bomber.mesh.material.color.set(0xFF8888);
-				if(frameTime - bomber.hit_time > 50){
+				if(frameTime() - bomber.hit_time > 50){
 					bomber.mesh.material.color.set(0xFFFFFF);
 					bomber.hit_time = -1;
 				}
@@ -4334,7 +4483,7 @@ function render(renderFrame){
 
 
 
-			if(frameNumber % 3 == 0){
+			if(frameNumber() % 3 == 0){
 				explosion.frame++;
 			}
 			if(explosion.frame > maxFrames-1){
@@ -4386,7 +4535,7 @@ function render(renderFrame){
 				maxFrames = 24;
 			}
 			
-			if(frameNumber % 3 == 0){
+			if(frameNumber() % 3 == 0){
 				light.frame++;
 			}
 			
@@ -4424,7 +4573,7 @@ function render(renderFrame){
 			}
 			maxFrames = Math.round(maxFrames*1.3+1);
 			
-			if(frameNumber % 3 == 0){
+			if(frameNumber() % 3 == 0){
 				visual.frame++;
 			}
 			
@@ -4444,7 +4593,7 @@ function render(renderFrame){
 		let splash = splashes[i];
 		
 		if(splash.alive){
-			if(frameNumber % 3 == 0){
+			if(frameNumber() % 3 == 0){
 				splash.frame++;
 			}
 			if(splash.frame >= 14-1){
@@ -4514,15 +4663,17 @@ function render(renderFrame){
 			if(player.mesh.position.x < -MAP_W/2-edgePadX){
 				player.mesh.position.x = MAP_W/2+edgePadX;
 			}
-			if(player.mesh.position.z < -MAP_H-edgePadY){
-				player.mesh.position.z = MAP_H/2+edgePadY/2;
-			}
+
 			if(player.mesh.position.x > MAP_W/2+edgePadX){
 				player.mesh.position.x = -MAP_W/2-edgePadX;
 			}
-			if(player.mesh.position.z > MAP_H/2+edgePadY/2){
-				player.mesh.position.z = -MAP_H-edgePadY;
-			}
+			
+			//if(player.mesh.position.z > MAP_H/2+edgePadY/2){
+			//	player.mesh.position.z = -MAP_H-edgePadY;
+			//}
+			//if(player.mesh.position.z < -MAP_H-edgePadY){
+			//	player.mesh.position.z = MAP_H/2+edgePadY/2;
+			//}
 			
 			let splash_size = SPLASH_LARGE;
 			let splash_offset_z = 0;
@@ -4615,7 +4766,7 @@ function render(renderFrame){
 			if(player.mesh.material.emissiveMap){
 			
 				if(player.type == TYPE_PLANE){
-					if(Math.round(frameNumber/30) % 3 == 0){
+					if(Math.round(frameNumber()/30) % 3 == 0){
 						player.mesh.material.emissive.set(0x000000);
 					}else{
 						player.mesh.material.emissive.set(0xFFFF55);
@@ -4732,16 +4883,16 @@ function render(renderFrame){
 				let bounce_opacity = true;
 				let color_opa = 1-skyboxMesh.material.opacity;
 				if(bounce_opacity){
-					//opa = (Math.sin(frameNumber/20)+1)/2;
+					//opa = (Math.sin(frameNumber()/20)+1)/2;
 					//opa *= opa;
-					color_opa = (Math.sin(frameNumber/30)+1)/2;
+					color_opa = (Math.sin(frameNumber()/30)+1)/2;
 				}
 				behindMesh.material.emissiveIntensity = opa;//opa;
 				
 				
 				let color = colorBetweenRGBA_array([0xFF0000, 0xFFFF00, 0x00FF00, 0x00FFFF, 0x0000FF, 0xFF00FF, 0xFF0000], color_opa);
 				//let color = colorBetweenRGBA_array([0xFF5555, 0xFFFF55, 0x55FF55, 0x55FFFF, 0x5555FF, 0xFF55FF, 0xFF5555], color_opa);
-				//if((frameNumber % 10) == 0){
+				//if((frameNumber() % 10) == 0){
 //					console.log(color);
 				//}
 				behindMesh.material.emissive.set(color);
@@ -4825,7 +4976,7 @@ function render(renderFrame){
 		let px = players[myPlayer].mesh.position.x;
 		let pz = players[myPlayer].mesh.position.z;
 		
-		let scrollFrameNum = frameNumber*0.5;
+		let scrollFrameNum = frameNumber()*0.5;
 
 		let mul = 0.8;
 		skyboxImg.offset.x = ((-px/(0.5*mul))/MAP_W)+scrollFrameNum/1000*.3;
@@ -4835,7 +4986,7 @@ function render(renderFrame){
 		nightskyImg.offset.x = ((px/10*aspect)/CANVAS_W);
 		nightskyImg.offset.y = ((-pz/10)/CANVAS_H);
 
-		if(flip_dir && (frameNumber % 2) == 0){
+		if(flip_dir && (frameNumber() % 2) == 0){
 		
 			// flip
 			planeFrameNum++;
@@ -5548,6 +5699,7 @@ function spawn_turret(owner, x, z, type){
 	let foundIndex = find_free_turret(type);
 	
 	let mesh;
+	let barrel_mesh;
 	let texture;
 	let turret = {};
 	
@@ -5564,12 +5716,33 @@ function spawn_turret(owner, x, z, type){
 		material.side = THREE.DoubleSide;
 
 		mesh = new THREE.Mesh(geometry, material);
+		
+		// create barrel:
+		{
+			// create size of 1 and then scale it to correct size, so translate works easier.
+			let geometry = new THREE.PlaneGeometry(1, 1);
+			let material = new THREE.MeshPhongMaterial();
+			material.color.set(0x000000);
+			material.transparent = false;
+			material.opacity = 1;
+			material.side = THREE.DoubleSide;
+			
+			// move pipe from middle to left a bit:
+			geometry.translate(0.2, 0, 0.5);
+			barrel_mesh = new THREE.Mesh(geometry, material);
+			let barrel_length = 50;
+			barrel_mesh.scale.set(barrel_length, 3, 1);
+		}
+		
+		
 	}else{
 		turret = turrets[foundIndex];
 		mesh = turret.mesh;
 		mesh.visible = true;
-		mesh.material.color.set(0xFFFFFF);
+		mesh.material.color.set(0xFFFFFF); // needed if the unit has "hit flash" effect (red).
 		texture = turret.texture;
+		barrel_mesh = turret.barrel_mesh;
+		barrel_mesh.visible = true;
 	}
 	
 	// set correct frame:
@@ -5585,6 +5758,21 @@ function spawn_turret(owner, x, z, type){
 	mesh.position.z = z;
 	
 	mesh.scale.set(mscale,mscale,mscale);
+	
+	
+	barrel_mesh.rotation.x = Math.PI/2;
+	barrel_mesh.rotation.z = 0; // reset rotation.
+	
+	
+	
+	if(type == TURRET_ANTIAIR){
+		barrel_mesh.position.x = x+1.5;
+		barrel_mesh.position.z = z-15;
+	}else if(type == TURRET_BOMBER){
+		barrel_mesh.position.x = x;
+		barrel_mesh.position.z = z-19.5;
+	}
+	barrel_mesh.position.y = Z_TURRET_BARREL;
 
 	// initialize data:
 	turret['frame'] = 0;
@@ -5600,14 +5788,17 @@ function spawn_turret(owner, x, z, type){
 	turret['owner'] = owner;
 	turret['smokestart'] = false;
 	turret['explode_time'] = -1;
+	turret['max_shoot_dist'] = MAX_TARGET_DISTANCE; // todo: read from map unit settings.
 	
 	// if was new turret, update mesh/texture too, and add to array/scene:
 	if(foundIndex == -1){
 		turret['mesh'] = mesh;
 		turret['texture'] = texture;
+		turret['barrel_mesh'] = barrel_mesh;
 		
 		turrets.push(turret);
 		scene.add(turrets[turrets.length-1].mesh);
+		scene.add(turrets[turrets.length-1].barrel_mesh);
 	}
 	
 }
@@ -5679,29 +5870,40 @@ function drop_bomb(owner, x, z, dire, speed, owned_by_ai){
 	scene.add(bombs[bombs.length-1].mesh);
 }
 
+
+
+// random value -range to range
+function randiff(range){
+	return (((Math.random()-0.5)*2)*range);
+}
+
+
 function todeg(rad){
 	return 180-rad*(180.0/Math.PI);
 }
 
 
+// ported to js from pete's python code for solving trajectory equation.
+// x0,y0 = from
+// x1,y1 = to
 function get_angles_for_target(x0, y0, x1, y1, v){
 	let delta_x = x1 - x0;
 	let delta_y = y1 - y0;
 	if(delta_x == 0){
 		if(delta_y > 0){
-			return [todeg(-Math.PI/2), null];
+			return [todeg(Math.PI/2), null]; // shoot straight down
 		}else{
-			return [todeg(Math.PI/2), null];
+			return [todeg(-Math.PI/2), null]; // shoot straight up
 		}
 	}
 	let k = delta_y/delta_x;
 
-	let c = (k - 2*GRAVITY_CONSTANT*delta_x/(2*v*v))/Math.sqrt(1+k*k);
+	let c = (k - 2*GRAVITY_CONSTANT*(delta_x/(2*v*v)))/Math.sqrt(1+k*k);
 	let alpha = Math.atan(-k);
 	let beta = Math.asin(c);
 
-	let theta_1 = 0.5*(beta - alpha);
-	let theta_2 = 0.5*(-beta + Math.PI - alpha);
+	let theta_1 = (beta - alpha) / 2;
+	let theta_2 = (-beta + Math.PI - alpha) / 2;
 	
 	let solutions = [theta_1-Math.PI, theta_2-Math.PI, theta_1, theta_2];
 		
@@ -5713,12 +5915,7 @@ function get_angles_for_target(x0, y0, x1, y1, v){
 
 	for(let i = 0; i < 4; i++){
 		let theta = solutions[i];
-		let t = delta_x/(Math.cos(theta)*v);
-		/*if(t > 0 && t < min_t){
-			min_t = t;
-			min_theta = theta;
-		}*/
-		
+		let t = delta_x/(Math.cos(theta)*v);		
 		if(t > 0){
 			ts.push([t, theta]);
 		}
@@ -5727,7 +5924,9 @@ function get_angles_for_target(x0, y0, x1, y1, v){
 	if(ts.length == 1){
 		min_theta = ts[0][1];
 	}else if(ts.length == 2){
+		// find min/max of first 2 values
 		if(ts[0][0] > ts[1][0]){
+			// if first value of t is larger, set max_theta as t's theta value.
 			min_theta = ts[1][1];
 			max_theta = ts[0][1];
 		}else{
@@ -5736,8 +5935,8 @@ function get_angles_for_target(x0, y0, x1, y1, v){
 		}
 	}
 
-	let min_a = (min_theta !== null) ? todeg(min_theta) : null;
-	let max_a = (max_theta !== null) ? todeg(max_theta) : null;
+	let min_a = (min_theta !== null) ? todeg(min_theta) : null; // straight shot
+	let max_a = (max_theta !== null) ? todeg(max_theta) : null; // ballistic shot (longer)
 	
 	return [min_a, max_a];
 }
@@ -5750,11 +5949,11 @@ function get_angles_for_target(x0, y0, x1, y1, v){
 
 
 
-function shoot_turret(turret, owner){
+function shoot_turret(turret, owner, shot_allowed){
 	//let angle = -(Math.random()*(160-20)+20); // -20 to -160
 	
-	let pred_amount = 200;
-	let hpred = Math.round(pred_amount/2);
+	//let pred_amount = 200;
+	//let hpred = Math.round(pred_amount/2);
 	let curplayer = players[myPlayer];
 	
 	let target_x = curplayer.mesh.position.x;
@@ -5762,17 +5961,19 @@ function shoot_turret(turret, owner){
 	
 	let dist = get_dist_2d(turret.x, turret.z, target_x, target_z);
 	
-	let max_dist = 1200; // 1200
-	let shot_minimum_acceptable_distance = 50;
+	//let shot_minimum_acceptable_distance = 50;
 	
 	// quick check to not process too far away players:
-	if(dist < max_dist){
+	if(dist < turret.max_shoot_dist){
+	
+	
+
 
 		let shot_start_x = turret.x;
 		let shot_start_z = turret.z-17;
 		
 		let bullet_speed = 20.1; // speed 1 = 1*0.1+20 (lol)
-		let max_frames_per_dist = 30*(max_dist*2)/bullet_speed; // double in case needed
+		let max_frames_per_dist = 30*(turret.max_shoot_dist*2)/bullet_speed; // double in case needed
 
 		// add prediction of player movement in the future:
 		let max_frames = Math.floor((dist/bullet_speed));
@@ -5886,12 +6087,10 @@ function shoot_turret(turret, owner){
 						}
 						
 						prev_shot_dist_diff = shot_dist_diff;
-						
-						
 					}
 
 					if(is_ground(shot.x, shot.z)){
-						console.log("cur_angle = "+cur_angle.toFixed(2)+" hits ground");
+						//console.log("cur_angle = "+cur_angle.toFixed(2)+" hits ground");
 						hit_ground = true;
 						break;
 					}
@@ -5907,7 +6106,7 @@ function shoot_turret(turret, owner){
 		}
 		
 		
-		console.log("found_angle = "+found_angle);
+		//console.log("found_angle = "+found_angle);
 		
 		if(found_angle !== null){
 			
@@ -5916,8 +6115,14 @@ function shoot_turret(turret, owner){
 			let random_spread = 0;//(Math.random()-0.5)*1.5; //1.5 degree spread.
 			let shot_angle = found_angle + random_spread;
 		
+			// always rotate turret to the correct rotation:
+			turret.barrel_mesh.rotation.z = (180-shot_angle)*(Math.PI/180.0);
 			
-			shoot_turret_from(owner, shot_start_x, shot_start_z, shot_angle, turret.type);
+			if(shot_allowed){
+				shoot_turret_from(owner, shot_start_x, shot_start_z, shot_angle, turret.type);
+				turret.shoot_start = getTimeMillis();
+			}
+			
 			//console.log("shoot turret from "+owner);
 		}
 	}
@@ -6147,14 +6352,13 @@ function onDocumentKeyDown(event) {
 
 			
 		}else if(keyCode == 115){ // 'F4'
-			if(guivisible){
-				$("#gui").hide();
-				//$("#sfxr_panel").hide();
-			}else{
-				$("#gui").show();
-				//$("#sfxr_panel").show();
-			}
 			guivisible ^= 1;
+			
+			if(guivisible){
+				$("#gui").show();
+			}else{
+				$("#gui").hide();
+			}
 			
 		}else if(keyCode == 49){ // '1'
 			change_player(keyCode-49);
