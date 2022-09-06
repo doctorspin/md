@@ -13,7 +13,7 @@
 	<meta property="og:description" content="Defend your ground by planes and soldiers!">
 	
 	<script src="three.js"></script>
-	<script src="OrbitControls.js"></script>
+	<!--<script src="OrbitControls.js"></script>-->
 
 	<link type="text/css" href="jquery/jquery-ui.css" rel="Stylesheet" />
 	<script type="text/javascript" src="jquery/jquery.min.js"></script>
@@ -457,17 +457,6 @@ body {
 
 
 
-<!--
-<script src="three.js"></script>
-<script src="OrbitControls.js"></script>
--->
-
-<!--<script src="https://threejs.org/examples/js/libs/dat.gui.min.js"></script>-->
-<!--<script src="https://threejs.org/examples/js/loaders/OBJLoader.js"></script>-->
-
-<!--
-<script src="jquery.min.js"></script>
--->
 	
 <script>
 /*jshint esversion: 6 */
@@ -629,6 +618,12 @@ GAME PAUSED
 </div>
 
 <script>
+"use strict";
+
+
+
+let INTERNAL_ZOOM = 1;
+let ZOOM_MULTI = 1.08;
 
 
 var ortho = true;
@@ -643,7 +638,10 @@ let game_paused_by_enter = false;
 
 var globalFilter = smoothRender ? THREE.LinearFilter : THREE.NearestFilter;
 
-	
+
+var contextmenu_enabled = false;
+
+var window_focus = true;
 
 let loading_start_time = 0;
 
@@ -776,7 +774,7 @@ var TEXTURES = {
 	'glowsprite_url': 			{path: 'sprites/glow2b.png', 
 								config: default_texture_config},
 								
-	'map_bg_url': 				{path: 'maps/parallax.png', 
+	'map_bg_parallax_url':		{path: 'maps/parallax.png', 
 								config: default_texture_config},
 								
 	'santa_sprite_url': 		{path: "sprites/SantaSleigh.png", 
@@ -812,10 +810,10 @@ var TEXTURES = {
 	'map_waterdrops_url': 		{path: 'textures/raindrop-ripples-oneliner2.png', 
 								config: default_texture_config},
 								
-	'skybox_url': 				{path: "textures/clouds/cloud-bg.jpg", 
+	'clouds_back_url': 			{path: "textures/clouds/cloud-bg.jpg", 
 								config: default_texture_config},
 								
-	'clouds_bg_url': 			{path: 'textures/clouds/cloud-layer.png', 
+	'clouds_front_url': 		{path: 'textures/clouds/cloud-layer.png', 
 								config: default_texture_config},
 								
 	'nightsky_url': 			{path: "textures/clouds/stars.png", 
@@ -1058,19 +1056,19 @@ var cloudColorTo = cloudsColorRain;
 var skyboxColorFrom = skyboxColor; // will be initialized on rain switch.
 var skyboxColorTo = skyboxColorRain;
 
-var maptexImg;
-var maptexImg2;
-var maptexImg3;
-var behindEmissiveTex;
-var maptexImg4;
+var mapCollisionTex;
+var mapParallaxTex;
+var mapBehindTex;
+var mapBehindEmissiveTex;
+var mapFrontTex;
 var mapTexWater;
 var mapTexWaterDrops;
 
 var bgTexImg1;
 var bgTexImg2;
-var bgTexClouds;
-var skyboxImg;
-var nightskyImg;
+var cloudsFrontTex;
+var cloudsBackTex;
+var nightskyTex;
 
 
 
@@ -1113,6 +1111,9 @@ var CANVAS_H = 1;
 
 var MOUSE_X = -1; // -1 = not set.
 var MOUSE_Y = -1;
+
+var MOUSE_OFFSET_X = 0;
+var MOUSE_OFFSET_Y = 0;
 
 var prevBombTime = 0;
 var bombStartTime = 0;
@@ -1278,8 +1279,8 @@ function load_textures(){
 	
 function rescale_skybox(){
 	let aspect = CANVAS_W/CANVAS_H;
-	nightskyImg.repeat.x = 1.3*aspect;
-	nightskyImg.repeat.y = 1.3;
+	nightskyTex.repeat.x = 1.3*aspect;
+	nightskyTex.repeat.y = 1.3;
 }
 
 
@@ -1557,7 +1558,7 @@ function setSpeed(i, speed){
 	if(speed > 150) speed = 150;
 	
 	players[i].internal_speed = speed;
-	real_speed = Math.sqrt(speed*speed*5)/10;
+	let real_speed = Math.sqrt(speed*speed*5)/10;
 	players[i].speed = real_speed;
 }
 
@@ -2089,14 +2090,17 @@ function generate_compressed_map(tex){
 	}
 	
 	let sq = Math.sqrt(totalBlocks);
-	let out_w = Math.ceil(sq)*blockSize;
-	let out_h = Math.ceil(sq)*blockSize;
-	let output_blocks = Math.ceil(sq)*Math.ceil(sq);
+	let sqblocks = Math.ceil(sq);
+	let out_w = sqblocks*blockSize;
+	let out_h = sqblocks*blockSize;
+	let output_blocks = sqblocks*sqblocks;
 	let compression_ratio = output_blocks/maxBlocks;
 	
-	console.log(out);
-	console.log("out_w = "+out_w);
-	console.log("out_h = "+out_h);
+	//console.log(out);
+	console.log("blocks required = "+totalBlocks);
+	console.log("output texture blocks = "+output_blocks);
+	console.log("maxBlocks = "+maxBlocks);
+	console.log("out size = "+out_w+"x"+out_h);
 	console.log("compression_ratio = "+(1/compression_ratio));
 	
 
@@ -2186,6 +2190,59 @@ function show_texture_loading_warning(err){
 
 
 
+// f_(top) etc: if null, no fading (top), otherwise fading length.
+function create_fading_plane_mesh(plane_w, plane_h, material, f_top, f_bottom, f_left, f_right){
+	if(typeof f_top === "undefined") f_top = null;
+	if(typeof f_bottom === "undefined") f_bottom = null;
+	if(typeof f_left === "undefined") f_left = null;
+	if(typeof f_right === "undefined") f_right = null;
+	
+	
+
+	var geometry = new THREE.PlaneBufferGeometry(plane_w, plane_h, 3, 3);
+	var count = geometry.attributes.position.count;
+	let BPP = 4;
+	geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(count*BPP), BPP));
+	
+	let mesh = new THREE.Mesh(geometry, material);
+	mesh.visible = SHOW_WAVE_BG;
+	mesh.rotation.x = -Math.PI / 2;
+	
+
+	var peak = 8;
+	var smoothing = 600;
+	var vertices = mesh.geometry.attributes.position.array;
+	var colors = mesh.geometry.attributes.color.array;
+	
+	console.log(colors.length);
+	console.log(colors);
+
+	//mesh.geometry.attributes.position.needsUpdate = true;
+	//mesh.geometry.computeVertexNormals();
+	
+	
+	//for(let y = 0; y < Y_VERT; y++){}
+	/*
+	for(var i = 0, c = 0; i <= vertices.length; i += 3, c+=BPP){
+		vertices[i+2] = Z_SKYBOX+5;
+	
+		// default color to white:
+		colors[c+0] = 1;
+		colors[c+1] = 1;
+		colors[c+2] = 1;
+		colors[c+3] = 1;
+
+	}
+	*/
+	mesh.geometry.attributes.position.needsUpdate = true;
+	
+	//console.log("mesh.geometry.attributes");
+	//console.log(mesh.geometry.attributes);
+	mesh.geometry.attributes.color.needsUpdate = true;
+	return mesh;
+}
+
+
 
 
 function pre_init(){
@@ -2197,6 +2254,7 @@ function pre_init(){
 
 	CANVAS_W = window.innerWidth;
 	CANVAS_H = window.innerHeight;
+
 	
 	console.log("CANVAS SIZE = "+CANVAS_W+"x"+CANVAS_H);	
 	
@@ -2215,29 +2273,30 @@ function pre_init(){
 	});
 	
 	
+	////////////////////////////
 	// CAMERAS
-	
 	if(ortho){
 		camera = new THREE.OrthographicCamera( -CANVAS_W/2, CANVAS_W/2, CANVAS_H/2, -CANVAS_H/2, 1, 1000000 );
+		camera.zoom = INTERNAL_ZOOM;
 	}else{
 		camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 1, 100000);
 	}
 	
 	camera.position.set(0, 300, 0);
-
-	
-	
 	cameraCube = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 1, 100000);
 
-	controls = new THREE.OrbitControls(camera);
-	controls.minDistance = 500;
-	controls.maxDistance = 25000;
+	//////////////////////
+	// CONTROLS FOR CAMERA
+	//controls = new THREE.OrbitControls(camera);
+	//controls.minDistance = 500;
+	//controls.maxDistance = 25000;
 
+	/////////////////////////////
 	// SCENE
-
 	scene = new THREE.Scene();
 	sceneCube = new THREE.Scene();
 
+	/////////////////////////////
 	// Lights
 	ambient = new THREE.AmbientLight(0xffffff);
 	scene.add(ambient);
@@ -2263,7 +2322,7 @@ function pre_init(){
 
 	// load main map texture: (map_path map_plane) load_map
 	set_loading_desc("Loading map");
-	maptexImg = new THREE.TextureLoader().load(texture_path('map_url'), function ( tex ) {
+	mapCollisionTex = new THREE.TextureLoader().load(texture_path('map_url'), function ( tex ) {
 		tex.image = correct_texture_size(tex.image);
 		loaded.map = true;
 		set_loading_desc("Map loaded");
@@ -2278,8 +2337,8 @@ function pre_init(){
 		// make texture pixelized (min and mag needed both!):
 		//let filter = THREE.NearestFilter;
 		let filter = globalFilter;
-		maptexImg.minFilter = filter;
-		maptexImg.magFilter = filter;
+		mapCollisionTex.minFilter = filter;
+		mapCollisionTex.magFilter = filter;
 		
 		set_loading_desc("Creating map data");
 		
@@ -2297,31 +2356,34 @@ function pre_init(){
 		// create playable map plane:
 		{
 		
-			console.log("maptexImg = "+maptex_w+"x"+maptex_h);
+			console.log("mapCollisionTex = "+maptex_w+"x"+maptex_h);
 			let geometry = new THREE.PlaneGeometry(maptex_w, maptex_h);
+
 
 			
 			{
-				let material = new THREE.MeshPhongMaterial({map: maptexImg, color: 0xFFFFFF});  
+				let material = new THREE.MeshPhongMaterial({map: mapCollisionTex, color: 0xFFFFFF});  
 				material.transparent = true;
 				material.side = THREE.DoubleSide;
 				material.alphaTest = 0.5;
 				mapMesh = new THREE.Mesh(geometry, material);
-				let mscale = 1;
+				//let mscale = 1;
 				mapMesh.rotation.x = -Math.PI/2;
+				mapMesh.position.x = 0;
 				mapMesh.position.y = Z_MAP_COLLISION;
 				mapMesh.position.z = 0;
-				mapMesh.scale.set(mscale,mscale,mscale);
+				//mapMesh.scale.set(mscale,mscale,mscale);
 				scene.add(mapMesh);
 			}
 			{	
-				let material = new THREE.MeshPhongMaterial({map: maptexImg, color: 0xBBBBBB});  
+				let material = new THREE.MeshPhongMaterial({map: mapCollisionTex, color: 0xBBBBBB});  
 				material.transparent = true;
 				material.opacity = 0.2;
 				material.side = THREE.DoubleSide;		
 				mapMeshFlipped = new THREE.Mesh(geometry, material);
 				let mscale = 1;
 				mapMeshFlipped.rotation.x = -Math.PI/2;
+				mapMeshFlipped.position.x = 0;
 				mapMeshFlipped.position.y = Z_MAP_COLLISION;
 				mapMeshFlipped.position.z = maptex_h;
 				mapMeshFlipped.scale.set(mscale,-mscale,mscale);
@@ -2429,13 +2491,13 @@ function pre_init(){
 		
 		
 		// load map sprites background layer:
-		behindEmissiveTex = new THREE.TextureLoader().load(texture_path('map_behind_lights_url'), function ( tex ) {
+		mapBehindEmissiveTex = new THREE.TextureLoader().load(texture_path('map_behind_lights_url'), function ( tex ) {
 			tex.image = correct_texture_size(tex.image);
 			loaded.map_behind_lights = true;
 			set_loading_desc("Map behind lights loaded");
 			
-			behindEmissiveTex.minFilter = globalFilter;
-			behindEmissiveTex.magFilter = globalFilter;
+			mapBehindEmissiveTex.minFilter = globalFilter;
+			mapBehindEmissiveTex.magFilter = globalFilter;
 		}, null, function(err){
 			loaded.map_behind_lights = true;
 			show_texture_loading_warning(err);
@@ -2443,23 +2505,23 @@ function pre_init(){
 		
 		
 		// load map sprites background layer:
-		maptexImg3 = new THREE.TextureLoader().load(texture_path('map_behind_url'), function ( tex ) {
+		mapBehindTex = new THREE.TextureLoader().load(texture_path('map_behind_url'), function ( tex ) {
 			tex.image = correct_texture_size(tex.image);
 			loaded.map_behind = true;
 			set_loading_desc("Map behind loaded");
 			
-			maptexImg3.minFilter = globalFilter;
-			maptexImg3.magFilter = globalFilter;
+			mapBehindTex.minFilter = globalFilter;
+			mapBehindTex.magFilter = globalFilter;
 
 			{
 				let geometry = new THREE.PlaneGeometry(maptex_w, maptex_h);
-				let material = new THREE.MeshPhongMaterial({map: maptexImg3, color: 0xFFFFFF});  
+				let material = new THREE.MeshPhongMaterial({map: mapBehindTex, color: 0xFFFFFF});  
 				material.transparent = true;
 				material.opacity = 1;
 				material.alphaTest = 0.5;
 				material.side = THREE.DoubleSide;
 				material.emissive.set(0xFFFFFF);
-				material.emissiveMap = behindEmissiveTex;
+				material.emissiveMap = mapBehindEmissiveTex;
 				material.emissiveIntensity = 0;
 					
 				behindMesh = new THREE.Mesh(geometry, material);
@@ -2480,17 +2542,17 @@ function pre_init(){
 		
 		
 		
-		maptexImg4 = new THREE.TextureLoader().load(texture_path('map_front_url'), function ( tex ) {
+		mapFrontTex = new THREE.TextureLoader().load(texture_path('map_front_url'), function ( tex ) {
 			tex.image = correct_texture_size(tex.image);
 			loaded.map_front = true;
 			set_loading_desc("Map front loaded");
 			
-			maptexImg4.minFilter = globalFilter;
-			maptexImg4.magFilter = globalFilter;
+			mapFrontTex.minFilter = globalFilter;
+			mapFrontTex.magFilter = globalFilter;
 
 			{
 				let geometry = new THREE.PlaneGeometry(maptex_w, maptex_h);
-				let material = new THREE.MeshPhongMaterial({map: maptexImg4, color: 0xFFFFFF});  
+				let material = new THREE.MeshPhongMaterial({map: mapFrontTex, color: 0xFFFFFF});  
 				material.transparent = true;
 				material.opacity = 1;
 				material.alphaTest = 0.5;
@@ -2516,17 +2578,17 @@ function pre_init(){
 		
 		
 		// load second background layer (parallax):
-		maptexImg2 = new THREE.TextureLoader().load(texture_path('map_bg_url'), function ( tex ) {
+		mapParallaxTex = new THREE.TextureLoader().load(texture_path('map_bg_parallax_url'), function ( tex ) {
 			tex.image = correct_texture_size(tex.image);
 			loaded.map_bg = true;
 			set_loading_desc("Map background loaded");
 			
-			maptexImg2.minFilter = THREE.LinearFilter; // makes rain more crispy looking (=better).
-			maptexImg2.magFilter = THREE.LinearFilter;
+			mapParallaxTex.minFilter = THREE.LinearFilter; // makes rain more crispy looking (=better).
+			mapParallaxTex.magFilter = THREE.LinearFilter;
 			
 			{
 				let geometry = new THREE.PlaneGeometry(maptex_w, maptex_h);
-				let material = new THREE.MeshPhongMaterial({map: maptexImg2, color: 0x666666});  
+				let material = new THREE.MeshPhongMaterial({map: mapParallaxTex, color: 0x666666});  
 				material.transparent = true;
 				material.opacity = 1;
 				material.side = THREE.DoubleSide;
@@ -2550,24 +2612,24 @@ function pre_init(){
 		
 		
 		// load "skybox" parallax:
-		skyboxImg = new THREE.TextureLoader().load(texture_path('skybox_url'), function ( tex ) {
+		cloudsBackTex = new THREE.TextureLoader().load(texture_path('clouds_back_url'), function ( tex ) {
 			tex.image = correct_texture_size(tex.image);
 			loaded.skybox = true;
 			set_loading_desc("Sky loaded");
 			
-			skyboxImg.minFilter = THREE.LinearFilter;
-			skyboxImg.magFilter = THREE.LinearFilter;
+			cloudsBackTex.minFilter = THREE.LinearFilter;
+			cloudsBackTex.magFilter = THREE.LinearFilter;
 			
-			skyboxImg.repeat.x = 20.8;
-			skyboxImg.repeat.y = 17.3316;
+			cloudsBackTex.repeat.x = 20.8;
+			cloudsBackTex.repeat.y = 17.3316;
 			
-			skyboxImg.wrapS = THREE.RepeatWrapping;
-			skyboxImg.wrapT = THREE.RepeatWrapping;
+			cloudsBackTex.wrapS = THREE.RepeatWrapping;
+			cloudsBackTex.wrapT = THREE.RepeatWrapping;
 
 			{
 			
 				let geometry = new THREE.PlaneGeometry(maptex_w*4, maptex_h*20);
-				let material = new THREE.MeshPhongMaterial({map: skyboxImg, color: skyboxColor});
+				let material = new THREE.MeshPhongMaterial({map: cloudsBackTex, color: skyboxColor});
 				material.transparent = true;
 				material.opacity = SHOW_NIGHTSKY_BG ? 0 : 1;
 				material.side = THREE.DoubleSide;
@@ -2588,23 +2650,23 @@ function pre_init(){
 		
 
 		// load "skybox" parallax:
-		nightskyImg = new THREE.TextureLoader().load(texture_path('nightsky_url'), function ( tex ) {
+		nightskyTex = new THREE.TextureLoader().load(texture_path('nightsky_url'), function ( tex ) {
 			tex.image = correct_texture_size(tex.image);
 			loaded.nightsky = true;
 			set_loading_desc("Nightsky loaded");
 			
-			nightskyImg.minFilter = THREE.LinearFilter;
-			nightskyImg.magFilter = THREE.LinearFilter;
+			nightskyTex.minFilter = THREE.LinearFilter;
+			nightskyTex.magFilter = THREE.LinearFilter;
 			
 			rescale_skybox();
 			
-			nightskyImg.wrapS = THREE.RepeatWrapping;
-			nightskyImg.wrapT = THREE.RepeatWrapping;
+			nightskyTex.wrapS = THREE.RepeatWrapping;
+			nightskyTex.wrapT = THREE.RepeatWrapping;
 			/*
 
 			{
 				let geometry = new THREE.PlaneGeometry(maptex_w*4, maptex_h*20);
-				let material = new THREE.MeshBasicMaterial({map: nightskyImg, color: skyboxColor});
+				let material = new THREE.MeshBasicMaterial({map: nightskyTex, color: skyboxColor});
 				material.transparent = true;
 				material.opacity = SHOW_NIGHTSKY_BG ? nightskyMaxOpacity : 0;
 				material.side = THREE.DoubleSide;
@@ -2625,118 +2687,47 @@ function pre_init(){
 		});
 		
 		
-		scene.background = nightskyImg; // add skybox. this simple!
+		scene.background = nightskyTex; // add skybox. this simple!
 		
 		
 		
 		// load clouds parallax:
-		bgTexClouds = new THREE.TextureLoader().load(texture_path('clouds_bg_url'), function ( tex ) {
+		cloudsFrontTex = new THREE.TextureLoader().load(texture_path('clouds_front_url'), function ( tex ) {
 			tex.image = correct_texture_size(tex.image);
 			loaded.clouds = true;
 			set_loading_desc("Clouds loaded");
 			
 			// make texture pixelized (min and mag needed both!):
-			bgTexClouds.minFilter = THREE.LinearFilter;
-			bgTexClouds.magFilter = THREE.LinearFilter;
-			bgTexClouds.repeat.x = 20*0.26*2;
-			bgTexClouds.repeat.y = 5*0.26*6.666;
+			cloudsFrontTex.minFilter = THREE.LinearFilter;
+			cloudsFrontTex.magFilter = THREE.LinearFilter;
+			cloudsFrontTex.repeat.x = 20*0.26*2;
+			cloudsFrontTex.repeat.y = 5*0.26*6.666;
 			
-			bgTexClouds.wrapS = THREE.RepeatWrapping;
-			bgTexClouds.wrapT = THREE.RepeatWrapping;
+			cloudsFrontTex.wrapS = THREE.RepeatWrapping;
+			cloudsFrontTex.wrapT = THREE.RepeatWrapping;
 
 			{
-				let geometry = new THREE.PlaneGeometry(maptex_w*4, maptex_h*20, 1, 20);
-				let material = new THREE.MeshPhongMaterial({map: bgTexClouds, color: cloudsColor});
+				let material = new THREE.MeshPhongMaterial({map: cloudsFrontTex, color: cloudsColor});
 				material.transparent = true;
 				material.opacity = 0.9;
 				material.side = THREE.DoubleSide;
-					
+
+				let geometry = new THREE.PlaneGeometry(maptex_w*4, maptex_h*20);
 				cloudsMesh = new THREE.Mesh(geometry, material);
-				let mscale = 1;
+				// TODO: needs buildAlphaMaterial() to work.
+				//cloudsMesh = create_fading_plane_mesh(maptex_w*4, maptex_h*20, material, 1024);
+
 				cloudsMesh.position.x = 0;
 				cloudsMesh.position.y = Z_CLOUDS;
 				cloudsMesh.position.z = 0;
 				
-			
 				cloudsMesh.rotation.x = -Math.PI/2;
-				cloudsMesh.scale.set(mscale,mscale,mscale);
+
 				scene.add(cloudsMesh);
-				
-				//console.log(cloudsMesh);
-				
-				//console.log(bgTexClouds);
-				
 			}
 		});
-		/*
-function create_fading_mesh(){
 
-		var geometry = new THREE.PlaneBufferGeometry( mapsize, mapsize, terrainVerts, terrainVerts );
-		var count = geometry.attributes.position.count;
-		geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(count*3), 3));
-		
-		terrain = new THREE.Mesh(geometry, mapMaterial);
-		terrain.visible = SHOW_WAVE_BG;
-		terrain.rotation.x = -Math.PI / 2;
-		
 
-		var peak = 8;
-		var smoothing = 600;
-		var vertices = terrain.geometry.attributes.position.array;
-		var perlin = new Perlin();
-		for(var i = 0; i <= vertices.length; i += 3){
-			vertices[i+2] = peak * perlin.noise(
-				(terrain.position.x + vertices[i+0])/smoothing, 
-				(terrain.position.z + vertices[i+1])/smoothing
-			);
-		}
-		terrain.geometry.attributes.position.needsUpdate = true;
-		terrain.geometry.computeVertexNormals();
-		
-		// flatten the terrain:
-		vertices = terrain.geometry.attributes.position.array;
-		var colors = terrain.geometry.attributes.color.array;
-		for(var i = 0, c = 0; i <= vertices.length; i += 3, c+=3){
-			vertices[i+2] = Z_SKYBOX+5;
-		
-			// default color to white:
-			colors[c+0] = 1.16;//1.2+(Math.random())*0.5;//Math.random()*3;
-			colors[c+1] = 1.16;//1.2+(Math.random())*0.5;//Math.random()*3;
-			colors[c+2] = 1.10;//1.2+(Math.random())*0.5;
-			
-			// stretch edge + fade to black:
-			if(vertices[i+0] <= -mapsize/2){
-				vertices[i+0] = -mapsize;
-				colors[c+0] = 0;
-				colors[c+1] = 0;
-				colors[c+2] = 0;
-			}
-			if(vertices[i+0] >= mapsize/2){
-				vertices[i+0] = mapsize;
-				colors[c+0] = 0;
-				colors[c+1] = 0;
-				colors[c+2] = 0;
-			}
-			if(vertices[i+1] <= -mapsize/2){
-				vertices[i+1] = -mapsize;
-				colors[c+0] = 0;
-				colors[c+1] = 0;
-				colors[c+2] = 0;
-			}
-			if(vertices[i+1] >= mapsize/2){
-				vertices[i+1] = mapsize;
-				colors[c+0] = 0;
-				colors[c+1] = 0;
-				colors[c+2] = 0;
-			}
-		}
-		terrain.geometry.attributes.position.needsUpdate = true;
-		//console.log("terrain.geometry.attributes");
-		//console.log(terrain.geometry.attributes);
-		//terrain.geometry.attributes.color.needsUpdate = true;
-		
-}
-		*/
 		
 
 		// load rain rainfall:
@@ -3308,7 +3299,35 @@ function create_fading_mesh(){
 	});
 
 	
-	
+	// todo: add rgba possibility here...
+	function buildAlphaMaterial(params){
+		const material = new THREE.MeshLambertMaterial(params);
+		
+		material.onBeforeCompile = function ( shader ) {
+			shader.uniforms.time = { value: 0 };
+			shader.vertexShader = 'uniform float time;\n' + shader.vertexShader;
+			shader.vertexShader = shader.vertexShader.replace(
+				'#include <begin_vertex>',
+				[
+					`float theta = sin( time + position.y ) / 2;`,
+					'float c = cos( theta );',
+					'float s = sin( theta );',
+					'mat3 m = mat3( c, 0, s, 0, 1, 0, -s, 0, c );',
+					'vec3 transformed = vec3( position ) * m;',
+					'vNormal = vNormal * m;'
+				].join( '\n' )
+			);
+			material.userData.shader = shader;
+		};
+
+		// Make sure WebGLRenderer doesnt reuse a single program
+		//material.customProgramCacheKey = function () {
+		//	return amount;
+		//};
+
+		return material;
+	}
+
 
 	// create map plane:
 	{
@@ -3318,19 +3337,16 @@ function create_fading_mesh(){
 		mapMaterial.color.set(0xffffff);
 		mapMaterial.vertexColors = THREE.VertexColors;
 		
-		//mapMaterial.transparent = true;
-		//mapMaterial.opacity = 0.5;
-		//mapMaterial.side = THREE.DoubleSide;
-
 		var geometry = new THREE.PlaneBufferGeometry( mapsize, mapsize, terrainVerts, terrainVerts );
 		var count = geometry.attributes.position.count;
-		geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(count*3), 3));
+	
+		let BPP = 4; // need buildAlphaMaterial() finished to alpha channel to work.
+		geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(count*BPP), BPP));
 		
 		terrain = new THREE.Mesh(geometry, mapMaterial);
 		terrain.visible = SHOW_WAVE_BG;
 		terrain.rotation.x = -Math.PI / 2;
 		
-
 		var peak = 8;
 		var smoothing = 600;
 		var vertices = terrain.geometry.attributes.position.array;
@@ -3347,7 +3363,7 @@ function create_fading_mesh(){
 		// flatten the terrain:
 		vertices = terrain.geometry.attributes.position.array;
 		var colors = terrain.geometry.attributes.color.array;
-		for(var i = 0, c = 0; i <= vertices.length; i += 3, c+=3){
+		for(var i = 0, c = 0; i <= vertices.length; i += 3, c+=BPP){
 			vertices[i+2] = Z_SKYBOX+5;
 		
 			// default color to white:
@@ -3938,6 +3954,8 @@ var frameTime_val = getTimeMillis();
 var frameNumber_val = 0;
 
 var rotatePlayer = 0;
+
+var prevShootStartTime = 0;
 
 function frameTime(){
 	return frameTime_val;
@@ -4627,7 +4645,7 @@ function render(renderFrame){
 			}else if(player.lane == -1){
 				player.mesh.position.y = Z_MAP_BEHIND_FRONT;
 			}else{
-				// lane '0' (collision layer)
+				// lane "0" (collision layer)
 				if(player.type == TYPE_SOLDIER){
 					player.mesh.position.y = Z_SOLDIER;
 				}else{
@@ -4970,7 +4988,7 @@ function render(renderFrame){
 	
 	
 	
-		
+
 	{
 	
 		let px = players[myPlayer].mesh.position.x;
@@ -4979,15 +4997,21 @@ function render(renderFrame){
 		let scrollFrameNum = frameNumber()*0.5;
 
 		let mul = 0.8;
-		skyboxImg.offset.x = ((-px/(0.5*mul))/MAP_W)+scrollFrameNum/1000*.3;
-		skyboxImg.offset.y = ((pz/(3*mul))/MAP_H);
+		cloudsBackTex.offset.x = ((-px/(0.5*mul))/MAP_W)+scrollFrameNum/1000*.3;
+		cloudsBackTex.offset.y = ((pz/(3*mul))/MAP_H);
 
 		let aspect = CANVAS_W/CANVAS_H;
-		nightskyImg.offset.x = ((px/10*aspect)/CANVAS_W);
-		nightskyImg.offset.y = ((-pz/10)/CANVAS_H);
+		nightskyTex.offset.x = ((px/10*aspect)/CANVAS_W);
+		nightskyTex.offset.y = ((-pz/10)/CANVAS_H);
+
+		mapParallaxTex.offset.x = ((px/10)/MAP_W);
+		mapParallaxTex.offset.y = ((-pz/15)/MAP_H);
+		
+		cloudsFrontTex.offset.x = ((px/5)/MAP_W)+scrollFrameNum/1500;
+		cloudsFrontTex.offset.y = ((-pz/20)/MAP_H);
+
 
 		if(flip_dir && (frameNumber() % 2) == 0){
-		
 			// flip
 			planeFrameNum++;
 			if(planeFrameNum >= 15-1){
@@ -5006,17 +5030,11 @@ function render(renderFrame){
 			
 			planeEmissiveTex.offset.x = (planeFrameNumX*98)/256;//+(1/256);
 			planeEmissiveTex.offset.y = (planeFrameNum*54)/1024;
-			
-			
 		}
 
 
 
-		maptexImg2.offset.x = ((px/10)/MAP_W);
-		maptexImg2.offset.y = ((-pz/15)/MAP_H);
 		
-		bgTexClouds.offset.x = ((px/5)/MAP_W)+scrollFrameNum/1500;
-		bgTexClouds.offset.y = ((-pz/20)/MAP_H);
 		
 		let waterSpeed = 0.1;
 		mapTexWater.offset.x = scrollFrameNum/1600*waterSpeed*1.5;
@@ -5083,9 +5101,6 @@ function render(renderFrame){
 						
 		}
 		
-
-		
-		
 	}
 
 
@@ -5095,55 +5110,47 @@ function render(renderFrame){
 
 
 	if(camstyle == 0){
+		/////////////////
+		// 3D style:
 		let cpx = players[myPlayer].mesh.position.x;
 		let cpy = players[myPlayer].mesh.position.y;
-		let cpz = players[myPlayer].mesh.position.z; // originally +23 to make the view skewed so it is not straight up view.
+		let cpz = players[myPlayer].mesh.position.z;
 		
-		let offset_x = 0;
-		let offset_z = 0;
-		if(MOUSE_X != -1){
-			offset_x = (MOUSE_X-(CANVAS_W/2))*2;
-			offset_z = (MOUSE_Y-(CANVAS_H/2))*2;
-		}
-		camera.position.x = cpx+offset_x; // for some reason adjusting these will fuck camera rotation...
-		camera.position.y = cpy+500; // how far camera is from ground; can see only things under it.
-		camera.position.z = cpz+offset_z;
+		camera.position.x = cpx+MOUSE_OFFSET_X;
+		camera.position.y = cpy+500;
+		camera.position.z = cpz+MOUSE_OFFSET_Y;
 		
 		//camera.lookAt( scene.position );
 		camera.lookAt(
-			cpx + offset_x, 
+			cpx + MOUSE_OFFSET_X, 
 			cpy, 
-			cpz + offset_z
+			cpz + MOUSE_OFFSET_Y
 		);
 		cameraCube.rotation.copy( camera.rotation );
 	}else{
-		
+		/////////////////
+		// 2D style:
 		let cpx = players[myPlayer].mesh.position.x;
 		let cpy = players[myPlayer].mesh.position.y;
-		let cpz = players[myPlayer].mesh.position.z; // originally +23 to make the view skewed so it is not straight up view.
+		let cpz = players[myPlayer].mesh.position.z;
 		
-		let offset_x = 0;
-		let offset_z = 0;
-		if(MOUSE_X != -1){
-			offset_x = (MOUSE_X-(CANVAS_W/2))*2;
-			offset_z = (MOUSE_Y-(CANVAS_H/2))*2;
-		}
-		
-		camera.position.x = cpx+offset_x; // for some reason adjusting these will fuck camera rotation...
-		camera.position.y = cpy+2000; // how far camera is from ground; can see only things under it.
-		camera.position.z = cpz+offset_z;
+		camera.position.x = cpx+MOUSE_OFFSET_X;
+		camera.position.y = cpy+2000;
+		camera.position.z = cpz+MOUSE_OFFSET_Y;
 		
 		//camera.lookAt( players[myPlayer].mesh.position );
 		camera.lookAt(
-			cpx + offset_x, 
+			cpx + MOUSE_OFFSET_X, 
 			cpy, 
-			cpz + offset_z
+			cpz + MOUSE_OFFSET_Y
 		);
-		
 	}
 	
 	renderer.render(scene, camera);
 }
+
+
+
 
 
 
@@ -6284,7 +6291,7 @@ document.addEventListener("keydown", onDocumentKeyDown, false);
 function onDocumentKeyDown(event) {
 	var keyCode = event.which;
 	
-	if(!game_paused){
+	if(!game_paused && gameLoadedVar){
 		KEYS[event.which] = true;
 		
 		console.log("keydown = "+keyCode);
@@ -6305,13 +6312,35 @@ function onDocumentKeyDown(event) {
 					respawn_turret(i);
 				}
 			//}
+
+		}else if(keyCode == 103){ // numpad 7
+			
+		}else if(keyCode == 104){ // numpad 8
+			
+		}else if(keyCode == 105){ // numpad 9
+			
+		}else if(keyCode == 100){ // numpad 4
+			
+		}else if(keyCode == 101){ // numpad 5
+			
+		}else if(keyCode == 102){ // numpad 6
+			
+		}else if(keyCode == 97){ // numpad 1
+			
+		}else if(keyCode == 98){ // numpad 2
+			
+		}else if(keyCode == 99){ // numpad 3
+			
+		}else if(keyCode == 96){ // numpad 0
+			
+		}else if(keyCode == 110){ // numpad ','/'del'
 			
 		}else if(keyCode == 69){ // 'E'
 			curplayer.lane++;
 			if(curplayer.lane > 1){
 				curplayer.lane = 1;
 			}
-			
+
 		}else if(keyCode == 81){ // 'Q'
 			curplayer.lane--;
 			if(curplayer.lane < -1){
@@ -6405,7 +6434,7 @@ function onDocumentKeyDown(event) {
 				// todo: add textures/clouds/sunset.png for sunset night mode.
 				//scene.background = new THREE.Color(0xFFFF00); // add skybox. this simple!
 			}else{
-				//scene.background = nightskyImg; // add skybox. this simple!
+				//scene.background = nightskyTex; // add skybox. this simple!
 				skyboxMesh.visible = true;
 				night_fade_dir = 1; // disable night
 			}
@@ -6421,7 +6450,7 @@ function onDocumentKeyDown(event) {
 				// todo: add textures/clouds/sunset.png for sunset night mode.
 				//scene.background = new THREE.Color(0xFFFF00); // add skybox. this simple!
 			}else{
-				//scene.background = nightskyImg; // add skybox. this simple!
+				//scene.background = nightskyTex; // add skybox. this simple!
 				skyboxMesh.visible = true;
 				night_fade_dir = 1; // disable night
 			}
@@ -6429,8 +6458,12 @@ function onDocumentKeyDown(event) {
 		}else if(keyCode == 48){ // '0'
 			SHOW_WAVE_BG ^= 1;
 			
+			// show bumpy sky:
 			terrain.visible = !!SHOW_WAVE_BG;
 			
+			// hide "real" sky:
+			skyboxMesh.visible = !SHOW_WAVE_BG;
+			cloudsMesh.visible = !SHOW_WAVE_BG;
 		}
 	} // !game_paused
 	
@@ -6467,7 +6500,7 @@ $(window).bind('beforeunload', function(){
 // onmousemove
 document.addEventListener("mousemove", onDocumentMouseMove, false);
 function onDocumentMouseMove(event) {
-	if(!game_paused){
+	if(!game_paused && gameLoadedVar){
 		var renderlayer = renderer.getSize();
 		var midX = renderlayer.width/2;
 		var midY = renderlayer.height/2;
@@ -6477,9 +6510,12 @@ function onDocumentMouseMove(event) {
 		// NOTE: DONT USE CTRL IN ANY COMBINATIONS SINCE CTRL+W QUITS PAGE.
 		// this way you can stop camera following mouse.
 		// todo: fix pointing direction being wrong if player not in middle of screen.
-		if(!key_down(16)){ // 'SHIFT'
-			MOUSE_X = x;
+		if(!key_down(16)){ // if not 'SHIFT'
+			MOUSE_X = x; // integers.
 			MOUSE_Y = y;
+			
+			MOUSE_OFFSET_X = (MOUSE_X-(CANVAS_W/2))*2;
+			MOUSE_OFFSET_Y = (MOUSE_Y-(CANVAS_H/2))*2;
 		}
 		
 		var angle = get_angle(midX, midY, x, y);
@@ -6505,12 +6541,60 @@ function onDocumentMouseMove(event) {
 	}
 };
 
+function stopEvent(event){
+	if(typeof event.preventDefault !== "undefined"){
+		event.preventDefault();
+	}
+	if(typeof event.stopPropagation !== "undefined"){
+		event.stopPropagation();
+	}
+}
 
+
+window.addEventListener("contextmenu", function(event){
+	if(!contextmenu_enabled){
+		event.preventDefault();
+	}
+});
+
+
+// if val distance to target is less or equal range.
+function is_near(val, target){
+	let range = 0.01;
+	return (Math.abs(val-target) <= range);
+}
+
+
+
+document.addEventListener('wheel', onDocumentWheel, { passive: false });
+function onDocumentWheel(event){
+	if(event.deltaY < 0){
+		// UP:
+		INTERNAL_ZOOM *= ZOOM_MULTI;
+	}else{
+		// DOWN:
+		INTERNAL_ZOOM /= ZOOM_MULTI;
+	}
+
+	// lock zoom to special multipliers (powers of two basically).
+	let tempzoom = INTERNAL_ZOOM;
+	let mults = [0.25, 0.5, 1, 2, 4];
+	for(let i = 0; i < mults.length; i++){
+		if(is_near(tempzoom, mults[i])){
+			tempzoom = mults[i];
+			console.log("zoom is exactly "+tempzoom);
+			break;
+		}
+	}
+
+	camera.zoom = tempzoom;
+	camera.updateProjectionMatrix();
+}
 
 
 document.addEventListener("mousedown", onDocumentMouseDown, false);
 function onDocumentMouseDown(event) {
-	if(!game_paused){
+	if(!game_paused && gameLoadedVar){
 		if(event.button == 0){ // left click leftclick
 			if(players.length > 0){
 				shoot_from_myplayer();
@@ -6547,6 +6631,8 @@ function onDocumentMouseDown(event) {
 			}
 		}
 	}
+	
+	stopEvent(event); // prevent any other handling of these events by browser.
 };
 
 
@@ -6554,7 +6640,8 @@ function onDocumentMouseDown(event) {
 
 document.addEventListener("mouseup", onDocumentMouseUp, false);
 function onDocumentMouseUp(event) {
-	//if(!game_paused){
+	// dont check paused here or keys can get stuck after unpausing.
+	if(gameLoadedVar){
 		if(event.button == 0){ // left click
 			shooting_started = false;
 			can_shoot = false;
@@ -6563,7 +6650,7 @@ function onDocumentMouseUp(event) {
 		}else if(event.button == 2){ // right click
 			
 		}
-	//}
+	}
 };
 
 
