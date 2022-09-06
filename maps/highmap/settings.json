@@ -37,7 +37,7 @@
 	
 	":comment": "0,0 coordinate is in middle of the map, so -w/2 is the left side, and -h/2 is the top side of map.",
 	"units": [
-		{"owner":-1, "type":"antiair", "x":3435, "y":-125},
+		{"owner":-1, "type":"antiair", "x":3435, "y":5},
 		{"owner":-1, "type":"bomber",  "x":3300, "y":97},
 		{"owner":-1, "type":"bomber",  "x":3220, "y":97},
 		{"owner":-1, "type":"bomber",  "x":3140, "y":97},
