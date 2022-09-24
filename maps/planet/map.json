@@ -9,8 +9,8 @@
 	
 	"desc": "Explore the planet to find out shortest route to victory!",
 	
-	"min_x":-8192, "max_x":8192,
-	"min_y":-8192, "max_y":8192,
+	"min_x":-18192, "max_x":18192,
+	"min_y":-18192, "max_y":18192,
 	":comment": "allowed playing area of the map. objects will either be destroyed or teleported when going outside map area.",
 	
 	"edge_thickness_x": 100, ":comment": "use x1/x2 if you want left/right to be different thicknesses.",
