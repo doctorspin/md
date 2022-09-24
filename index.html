@@ -822,6 +822,17 @@ class Perlin {
 
 
 
+var colorList = [0xFF9595, 0xFF95BD, 0xFF95E0, 0xFF65FA, 0xCAC1FF, 0x79B8FF, 0x19C1FF, 0x01EAFF, 0x01FFCC, 0x8BD783, 0x5CD050, 0xF8FF3F, 0xFBFF99, 0xFDFFCF, 0xFFE9CF, 0xFFC581, 0xFFA281];
+
+var colorListHtml = ["#FF9595", "#FF95BD", "#FF95E0", "#FF65FA", "#CAC1FF", "#79B8FF", "#19C1FF", "#01EAFF", "#01FFCC", "#8BD783", "#5CD050", "#F8FF3F", "#FBFF99", "#FDFFCF", "#FFE9CF", "#FFC581", "#FFA281"];
+
+var randomWords = ["soldier", "admiral", "general", "lieutenant"];
+
+let alphanumeric = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+
+
+
 
 let INTERNAL_ZOOM = 1;
 let ZOOM_MULTI = 1.08;
@@ -962,16 +973,12 @@ var Z_RAIN = NEWZIN(); // rain texture.
 
 
 
-
-
-
-
 var urlprefix = ""; // possibly used when using server to host files: "https://md.com/" etc.
 
 var MAP_NAME = "planet";
 //var MAP_NAME = "highmap";
 var MAP_FOLDER = urlprefix+'maps/'+MAP_NAME;
-var MAP_DATA_URL = MAP_FOLDER+'/map.json';
+var MAP_DATA_URL = MAP_FOLDER+'/map.json'+randomVersion();
 
 
 var GRAVITY_PLANAR = 0; // default
@@ -984,9 +991,9 @@ var GRAVITY_DEFAULT = {
 };
 // todo: remove this and use map.json to define pieces...
 let PLANETS = [
-	{x:0,    y:0},
-	{x:8000, y:0},
-	{x:4000, y:-7000},
+	{x:0,     y:0, 		range:10000, minradius:2500},
+	{x:16000, y:0, 		range:10000, minradius:2500},
+	{x:8000,  y:-15000, range:10000, minradius:2500},
 ];
 var GRAVITY = GRAVITY_DEFAULT;
 
@@ -1939,12 +1946,6 @@ function get_angle_rads(from_x, from_y, to_x, to_y){
 
 
 
-
-
-var colorList = [0xFF9595, 0xFF95BD, 0xFF95E0, 0xFF65FA, 0xCAC1FF, 0x79B8FF, 0x19C1FF, 0x01EAFF, 0x01FFCC, 0x8BD783, 0x5CD050, 0xF8FF3F, 0xFBFF99, 0xFDFFCF, 0xFFE9CF, 0xFFC581, 0xFFA281];
-
-var colorListHtml = ["#FF9595", "#FF95BD", "#FF95E0", "#FF65FA", "#CAC1FF", "#79B8FF", "#19C1FF", "#01EAFF", "#01FFCC", "#8BD783", "#5CD050", "#F8FF3F", "#FBFF99", "#FDFFCF", "#FFE9CF", "#FFC581", "#FFA281"];
-
 function randomColor(){
 	var ran = Math.floor(Math.random()*colorList.length);
 	this.color = colorList[ran];
@@ -1952,14 +1953,12 @@ function randomColor(){
 }
 
 
-var randomWords = ["soldier", "admiral", "general", "lieutenant"];
-
 
 function randomNick(){
 	return randomWords[Math.floor(Math.random()*randomWords.length)];
 }
 
-let alphanumeric = "abcdefghijklmnopqrstuvwxyz0123456789";
+
 
 function random_str(len){
 	let out = "";
@@ -1967,6 +1966,10 @@ function random_str(len){
 		out += alphanumeric[Math.floor(Math.random()*alphanumeric.length)];
 	}
 	return out;
+}
+
+function randomVersion(){
+	return "?v="+random_str(20);
 }
 
 
@@ -3270,17 +3273,20 @@ function load_map_collision(path){
 			
 
 			for(let i = 0; i < PLANETS.length; i++){
+				let planet = PLANETS[i];
 				let collisiondata = {
-					'x': PLANETS[i].x,
-					'z': PLANETS[i].y,
+					'x': planet.x,
+					'z': planet.y,
 					'w': tex.image.width,
 					'h': tex.image.height,
 					'data': hitdata,
 				};
 				COLLISION_DATA['MAP_DATA'].push(collisiondata);
 				GRAVITY.points.push({
-					'x': collisiondata.x,
-					'z': collisiondata.z
+					'x': planet.x,
+					'z': planet.y,
+					'range': planet.range,
+					'minradius': planet.minradius,
 				});
 				
 				let mesh = new THREE.Mesh(geometry, material);
@@ -4975,8 +4981,9 @@ function get_gravity_angle(x,z){
 		for(let i = 0; i < GRAVITY.points.length; i++){
 			//a = get_angle(cpx, cpz, GRAVITY.point.x, GRAVITY.point.z);
 			let dire = new get_kxy(x, z, GRAVITY.points[i].x, GRAVITY.points[i].z);
-			kx += dire.x;
-			kz += dire.z;
+			let force = get_force(x, z, GRAVITY.points[i]);
+			kx += dire.x*force;
+			kz += dire.z*force;
 		}
 		//let a = get_angle(x, z, GRAVITY.point.x, GRAVITY.point.z);
 		// must be set after lookAt(), and as fixed value rather than addition/substraction.
@@ -4988,14 +4995,28 @@ function get_gravity_angle(x,z){
 }
 
 
+function get_force(x, z, point){
+	let dist = get_dist_2d(x, z, point.x, point.z);
+	if(dist > point.range){
+		//dist = point.range;
+	}
+	if(dist < point.minradius){
+		dist = point.minradius;
+	}
+	//return (1-(dist/point.range)) * GRAVITY.value;
+	return GRAVITY.value * (6000000/(dist*dist));
+	
+	//0.15 * (10000/(5000*5000))
+}
 
 function apply_gravity(obj){
 	if(GRAVITY.style == GRAVITY_CIRCULAR){
 		for(let i = 0; i < GRAVITY.points.length; i++){
 			let point = GRAVITY.points[i];
 			let gdir = new get_kxy(obj.x, obj.z, point.x, point.z);
-			obj.kx += gdir.x*GRAVITY.value;
-			obj.kz += gdir.z*GRAVITY.value;
+			let force = get_force(obj.x, obj.z, point);
+			obj.kx += gdir.x*force;
+			obj.kz += gdir.z*force;
 		}
 	}else{
 		// default to linear gravity.
