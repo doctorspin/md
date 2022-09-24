@@ -5007,7 +5007,7 @@ function get_gravity_angle(x,z){
 	}
 }
 
-var ppp = 0;
+
 
 function get_force(x, z, point){
 	let dist = get_dist_2d(x, z, point.x, point.z);
@@ -5017,17 +5017,9 @@ function get_force(x, z, point){
 	if(dist < point.minradius){
 		dist = point.minradius;
 	}
-	let force = GRAVITY.value * (6000000/(dist*dist));
-	ppp++;
-	if(ppp > 1000){
-		console.log(GRAVITY.value.toFixed(3)+" * (6000000/("+dist.toFixed(1)+"*"+dist.toFixed(1)+")) = "+force.toFixed(8));
-		ppp = 0;
-	}
-	//return (1-(dist/point.range)) * GRAVITY.value;
-	return force;
-	
-	//0.15 * (10000/(5000*5000))
+	return GRAVITY.value * (6000000/(dist*dist));
 }
+
 
 function apply_gravity(obj){
 	if(GRAVITY.style == GRAVITY_CIRCULAR){
