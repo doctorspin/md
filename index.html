@@ -25,6 +25,9 @@
 
 
 <!--
+24.9.
+- converted planet textures to webp format to be able to upload to github, and probably keep using webp in future since it saves a lot of space.
+
 23.9.
 - fixed soldier animation code to actually work properly if it runs too fast.
 - cleaned up plane flipping/animation code.
@@ -769,6 +772,10 @@ class Perlin {
 <div id="pause_container"><div id="pause_container_inner">
 	<div id="pause_text">GAME PAUSED</div>
 	<div id="pause_desc"><span id="by_enter">Press ESC</span><span id="by_click">Click</span> to unpause</div>
+	<!--
+	<div>Settings</div>
+	<div>Keys</div>
+	-->
 </div></div>
 
 <div id="messages_container">
@@ -975,6 +982,12 @@ var GRAVITY_DEFAULT = {
 	points: [], // array of gravity points. if no points: no gravity.
 	value: 0.15,
 };
+// todo: remove this and use map.json to define pieces...
+let PLANETS = [
+	{x:0,    y:0},
+	{x:8000, y:0},
+	{x:4000, y:-7000},
+];
 var GRAVITY = GRAVITY_DEFAULT;
 
 let WATER_ENABLED = false;
@@ -1572,6 +1585,7 @@ var COLLISION_DATA = {
 	'OBJECTS': {}, // {'sprite_name': collision_data}
 };
 
+
 let map_defaults = {}; // default map settings which will be combined with map settings.json.
 let mapinfo = {};
 
@@ -1720,7 +1734,7 @@ function rescale_skybox(){
 
 
 var rainfallMesh = null;
-var behindMesh = null;
+var behindMeshes = [];
 var cloudsFrontMesh = null;
 var cloudsBackMesh = null;
 var nightskyMesh = null;
@@ -1729,7 +1743,7 @@ var waterDownBack = null;
 var waterDownFront = null;
 var waterdropsMesh = null;
 
-var mapMesh = null;
+
 var mapMeshFlipped = null;
 
 let sprites = {};
@@ -2834,17 +2848,21 @@ function load_map_behind(path){
 			material.emissive.set(0xFFFFFF);
 			material.emissiveMap = mapBehindEmissiveTex;
 			material.emissiveIntensity = 0;
-				
-			behindMesh = new THREE.Mesh(geometry, material);
-			behindMesh.visible = SHOW_MAP_BG;
-			let mscale = 1;
-			behindMesh.position.x = 0;
-			behindMesh.position.y = Z_MAP_BEHIND;
-			behindMesh.position.z = 0;
 			
-			behindMesh.rotation.x = -Math.PI/2;
-			behindMesh.scale.set(mscale,mscale,mscale);
-			scene.add(behindMesh);
+			for(let i = 0; i < PLANETS.length; i++){
+				let behindMesh = new THREE.Mesh(geometry, material);
+				behindMesh.visible = SHOW_MAP_BG;
+				let mscale = 1;
+				behindMesh.position.x = PLANETS[i].x;
+				behindMesh.position.y = Z_MAP_BEHIND;
+				behindMesh.position.z = PLANETS[i].y;
+				
+				behindMesh.rotation.x = -Math.PI/2;
+				behindMesh.scale.set(mscale,mscale,mscale);
+				scene.add(behindMesh);
+				
+				behindMeshes.push(behindMesh);
+			}
 		}
 		
 		loaded.map_behind = true;
@@ -2884,17 +2902,20 @@ function load_map_front(path){
 			material.opacity = 1;
 			//material.alphaTest = 0.5;
 			material.side = THREE.DoubleSide;
-				
-			let mapobj2 = new THREE.Mesh(geometry, material);
-			mapobj2.visible = SHOW_MAP_BG;
-			let mscale = 1;
-			mapobj2.position.x = 0;
-			mapobj2.position.y = Z_MAP_FRONT;
-			mapobj2.position.z = 0;
 			
-			mapobj2.rotation.x = -Math.PI/2;
-			mapobj2.scale.set(mscale,mscale,mscale);
-			scene.add(mapobj2);
+			
+			for(let i = 0; i < PLANETS.length; i++){
+				let mesh = new THREE.Mesh(geometry, material);
+				mesh.visible = SHOW_MAP_BG;
+				let mscale = 1;
+				mesh.position.x = PLANETS[i].x;
+				mesh.position.y = Z_MAP_FRONT;
+				mesh.position.z = PLANETS[i].y;
+				
+				mesh.rotation.x = -Math.PI/2;
+				mesh.scale.set(mscale,mscale,mscale);
+				scene.add(mesh);
+			}
 		}
 		loaded.map_front = true;
 	}, null, function(err){
@@ -3228,15 +3249,9 @@ function load_map_collision(path){
 		let piece_x = 0;
 		let piece_z = 0;
 		
+		let hitdata = new generate_hit_data(tex);
 
-		let collisiondata = {
-			'x': piece_x,
-			'z': piece_z,
-			'w': tex.image.width,
-			'h': tex.image.height,
-			'data': new generate_hit_data(tex),
-		};
-		COLLISION_DATA['MAP_DATA'].push(collisiondata);
+
 		
 		//console.log("COLLISION_DATA");
 		//console.log(COLLISION_DATA);
@@ -3252,17 +3267,34 @@ function load_map_collision(path){
 			material.alphaTest = 0.5;
 			
 			let geometry = new THREE.PlaneGeometry(tex.image.width, tex.image.height);
-			mapMesh = new THREE.Mesh(geometry, material);
+			
 
-			mapMesh.rotation.x = -Math.PI/2;
-			
-			mapMesh.position.x = piece_x;
-			mapMesh.position.y = Z_MAP_COLLISION;
-			mapMesh.position.z = piece_z;
-			
-			mapMesh.scale.set(1,1,1);
-			
-			scene.add(mapMesh);
+			for(let i = 0; i < PLANETS.length; i++){
+				let collisiondata = {
+					'x': PLANETS[i].x,
+					'z': PLANETS[i].y,
+					'w': tex.image.width,
+					'h': tex.image.height,
+					'data': hitdata,
+				};
+				COLLISION_DATA['MAP_DATA'].push(collisiondata);
+				GRAVITY.points.push({
+					'x': collisiondata.x,
+					'z': collisiondata.z
+				});
+				
+				let mesh = new THREE.Mesh(geometry, material);
+
+				mesh.rotation.x = -Math.PI/2;
+				
+				mesh.position.x = collisiondata.x;
+				mesh.position.y = Z_MAP_COLLISION;
+				mesh.position.z = collisiondata.z;
+				
+				mesh.scale.set(1,1,1);
+				
+				scene.add(mesh);
+			}
 		}
 		
 		if(WATER_ENABLED){
@@ -3366,8 +3398,8 @@ function load_map(){
 
 			if(piece_group.length > 0){
 				// add stuff only if there were any visible pieces. (maybe later allow empty pieces too).
+				/*
 				let has_gravity = true;
-		
 				if(has_gravity){
 					// todo: set style to GRAVITY_CIRCULAR
 					GRAVITY.points.push({
@@ -3375,6 +3407,7 @@ function load_map(){
 						'z': piece.position_y
 					});
 				}
+				*/
 
 				MAP_PIECES.push(piece_group);
 			}
@@ -5019,6 +5052,8 @@ function render(renderFrame){
 
 	
 
+	// todo: make it shoot from the position where the mesh is at the end of this frame.
+	// currently shoots from previous frame position.
 	if(shooting_started){
 		
 		if(getTimeMillis()-prevShootStartTime > continuous_shoot_delay){
@@ -6026,26 +6061,22 @@ function render(renderFrame){
 
 		
 			
-			if(behindMesh !== null){
+			if(behindMeshes.length > 0){
 			
 				// animate behind.png lightmap color:
 				let opa = 1-clouds_opacity;
 				let bounce_opacity = true;
 				let color_opa = 1-clouds_opacity;
 				if(bounce_opacity){
-					//opa = (Math.sin(frameNumber()/20)+1)/2;
-					//opa *= opa;
 					color_opa = (Math.sin(frameNumber()/30)+1)/2;
 				}
-				behindMesh.material.emissiveIntensity = opa;//opa;
-				
 				
 				let color = colorBetweenRGBA_array([0xFF0000, 0xFFFF00, 0x00FF00, 0x00FFFF, 0x0000FF, 0xFF00FF, 0xFF0000], color_opa);
-				//let color = colorBetweenRGBA_array([0xFF5555, 0xFFFF55, 0x55FF55, 0x55FFFF, 0x5555FF, 0xFF55FF, 0xFF5555], color_opa);
-				//if((frameNumber() % 10) == 0){
-//					console.log(color);
-				//}
-				behindMesh.material.emissive.set(color);
+				
+				for(let i = 0; i < behindMeshes.length; i++){
+					behindMeshes[i].material.emissiveIntensity = opa;
+					behindMeshes[i].material.emissive.set(color);
+				}
 			
 			}
 			
@@ -7446,7 +7477,7 @@ function shoot_planegun_nosound(owner, x, z, bullet_angle, object_speed, type){
 	//material.blending = THREE.AdditiveBlending;
 
 	let mesh = new THREE.Mesh(geometry, material);
-	let mscale = 1;
+	let mscale = 10;
 	mesh.position.x = x;
 	mesh.position.y = Z_MAP_SHOTS;
 	mesh.position.z = z;
@@ -7581,11 +7612,9 @@ function onDocumentKeyDown(event){
 			}
 			
 		}else if(keyCode == 82){
-			mapMesh.material.alphaTest += 0.1;
-			console.log(mapMesh.material.alphaTest);
+
 		}else if(keyCode == 70){
-			mapMesh.material.alphaTest -= 0.1;
-			console.log(mapMesh.material.alphaTest);
+
 		}else if(keyCode == 87){ // 'W'
 			// jump
 			
