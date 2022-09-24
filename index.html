@@ -7523,7 +7523,7 @@ function shoot_planegun_nosound(owner, x, z, bullet_angle, object_speed, type){
 	let mesh = new THREE.Mesh(geometry, material);
 	let mscale = 1;
 	if(DEV_MODE){
-		mscale = 20;
+		mscale = 20; // for testing.
 	}
 	mesh.position.x = x;
 	mesh.position.y = Z_MAP_SHOTS;
