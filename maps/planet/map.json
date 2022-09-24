@@ -20,6 +20,7 @@
 	"teleport_from_edges_x": false, 
 	"teleport_from_edges_y": false, 
 	":comment": "x = left/right, y = top/bottom teleportation.",
+
 		
 	"mingameversion": "1.0.0",
 	":comment": "refers to game version string",
