@@ -4672,6 +4672,10 @@ function post_init(){
 	spawn_bombers();
 	
 
+	console.log("GRAVITY");
+	console.log(GRAVITY);
+	
+	
 	if(mapinfo.hasOwnProperty("units")){
 		load_units(mapinfo.units);
 	}
@@ -4679,8 +4683,6 @@ function post_init(){
 	spawn_portals();
 	
 	
-	console.log("GRAVITY");
-	console.log(GRAVITY);
 	
 	let use_db = 0;
 	
@@ -7013,7 +7015,17 @@ function spawn_turret(unit){
 
 
 	let rotation = get_gravity_angle(x,z);
+	console.log("turret angle = "+rotation);
+/*
 
+index.html:7018 turret angle = 27.512071717432974
+index.html:7018 turret angle = 17.286664431118425
+index.html:7018 turret angle = 7.187139673880353
+index.html:7018 turret angle = -2.8023914853795873
+index.html:7018 turret angle = -12.701444410582582
+index.html:7018 turret angle = -22.529799576086916
+index.html:7018 turret angle = -32.30536808893038
+*/
 
 	let foundIndex = find_free_turret(type);
 	
