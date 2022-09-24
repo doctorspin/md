@@ -1,0 +1,241 @@
+{
+	":FORMATTING_NOTICES": "use ':comment' as key to add comments. add ':' before the key if wanting to remove that key temporarily.",
+	"name": "Planet",
+	
+	"mapversion": "1.0.0",
+	":comment": "patch = bugfixes, minor = small changes to gameplay, major = big changes to gameplay.",
+	":comment": "should be at minimum 0.1.0 for first version. 1.0.0 means it is no longer alpha/beta version and is ready to be published.",
+	":comment": "note: if the original map differs too much from newest version, it might be smarter to change the map name.",
+	
+	"desc": "Explore the planet to find out shortest route to victory!",
+	
+	"min_x":-8192, "max_x":8192,
+	"min_y":-8192, "max_y":8192,
+	":comment": "allowed playing area of the map. objects will either be destroyed or teleported when going outside map area.",
+	
+	"edge_thickness_x": 100, ":comment": "use x1/x2 if you want left/right to be different thicknesses.",
+	"edge_thickness_y": 1000,  ":comment": "use y1/y2 if you want top/bottom to be different thicknesses.",
+	":comment": "this defines basically how short/long is the fading of clouds to stars texture at edges.",
+	"edge_health_loss_ratio": 10, ":comment": "how much hp you lose per frame when you are in the edge area.",
+	"teleport_from_edges_x": true, 
+	"teleport_from_edges_y": true, 
+	":comment": "x = left/right, y = top/bottom teleportation.",
+		
+	"mingameversion": "1.0.0",
+	":comment": "refers to game version string",
+	":comment": "at which game version this map was designed for.",
+	":comment": "",
+	
+	"maxgameversion": "1.0.0",
+	":comment": "use this if you are sure that it doesnt work on newest game versions.",
+	
+	"basemap": {"name": "mapname", "version": "1.0.0"},
+	":comment": "version must match exactly the map.",
+	":comment": "if defined, then this map only adds stuff to the basemap. use this if you want to quickly adjust some map to your preferences without copying all the files to a new map file. all properties are only additive, so if you want to change map piece coordinates, the edited piece must have the same name.",
+	
+	"designed_to_mods": [
+		{"name":"basic", "minversion":"1.0.0"}
+	],
+	":comment": "list of mods that this map works best.",
+	
+	"not_designed_to_mods": [
+		{"name":"basic", "minversion":"1.0.0"}
+	],
+	":comment": "opposite of designed_to_mods. if you want to hide this map for certain mods, use this list.",
+
+
+	":comment": "list of pieces that creates the map.",
+	"map": [
+		{
+			"name": "big planet",
+						
+			":back": "back-atmo.png", 
+			":middle": "collision_holed.png", 
+			":front": "front.png", 
+			
+			"images": [
+				{
+					":comment": "type defines where in z axis the texture will be placed. from furthest to nearest: back, middle, front.",
+					"type": "back",
+					"textures": {
+						":comment": "basic texture without any special effects",
+						"main": {
+							"path": "back-atmo.png"
+						},
+						
+						":comment": "lightmap is used on night mode",
+						":lightmap": {
+							"path": "back-atmo-lights.png",
+							
+							":comment": "brightness is 0-1 value, where 0 is the maximum darkness. use -1 to use (1-brightness) as the opacity of lightmap",
+							"enabled_at_brightness": 0,
+							
+							":comment": "set animation for lightmap colors to create disco lights:",
+							"animation_style": "bounce",
+							"bounce_speed": 20,
+							"start_percent": 0,
+							"gradient": ["FF0000", "FFFF00", "00FF00", "00FFFF", "0000FF", "FF00FF", "FF0000"],
+							"gradient_brightness": 0.5
+						},
+						
+						":comment": "bumpmap allows 3d effects for textures when using lights.",
+						":bumpmap": {
+							"path": "back-atmo-bumps.png"
+						}
+					},
+					":comment": "below values are defaults for each texture in this group. each texture can set their own values too.",
+					"smooth": true,
+					"scale_x": 1.0,
+					"scale_y": 1.0,
+					"opacity": 1.0,
+					"alphatest": 0.0,
+					"offset_x": 0,
+					"offset_y": 0
+				},
+				{
+					"type": "middle",
+					"alphatest": 0.5,
+					":comment": "alphatest cuts any opacity below this value, so it makes blurred edges sharper at this value.",
+					"textures": {
+						"main": {
+							"path": "collision_holed.png"
+						}
+					}
+				},
+				{
+					"type": "front",
+					"textures": {
+						"main": {
+							"path": "front.png"
+						}
+					}
+				}
+			],
+			"anchor_x": "50%",
+			"anchor_y": "50%",
+			":comment": "100% means bottom of the texture. default is 50% for both x/y values.",
+			":comment": "anchor x/y is from where the piece is moved, AKA grabbing point.",
+			"position_x": 8192,
+			"position_y": 0,
+			":comment": "0,0 is origo. negative = to up & to left",
+			":comment": "position x/y is the global coordinate where the piece is moved from anchor point.",
+			
+			"gravity": {
+				"style": "circular",
+				"force": 0.15,
+				
+				":comment": "max force radius means that the gravity will fade out from that radius to both directions; inside and outside. meaning the center of the planet will have zero gravity like it should.",
+				"max_force_at_radius": 4000,
+				
+				":comment": "the radius when gravity has faded to zero outside of circle.",
+				"max_radius": 8000
+			}
+		},
+		{
+			"name": "small planet",
+			
+			":back": "back-atmo_small.png", 
+			":middle": "collision_small.png", 
+			":front": "front_small.png", 
+			
+			"back": "back-atmo2.webp", 
+			"middle": "collision_holed.webp", 
+			":front": "front.png", 
+			
+			"anchor_x": "50%",
+			"anchor_y": "50%",
+			":comment": "100% means bottom of the texture. default is 50% for both x/y values.",
+			":comment": "anchor x/y is from where the piece is moved, AKA grabbing point.",
+			"position_x": 0,
+			"position_y": 0,
+			":comment": "0,0 is origo. negative = to up & to left",
+			":comment": "position x/y is the global coordinate where the piece is moved from anchor point.",
+			
+			"gravity": {
+				"style": "circular",
+				"force": 0.15,
+				
+				":comment": "max force radius means that the gravity will fade out from that radius to both directions; inside and outside. meaning the center of the planet will have zero gravity like it should.",
+				"max_force_at_radius": 4000,
+				
+				":comment": "the radius when gravity has faded to zero outside of circle.",
+				"max_radius": 8000
+			}
+		}
+	],
+	
+	"weather": {
+		":comment": "default gravity settings, can be overridden by map pieces.",
+		"gravity": {
+			"style": "circular",
+			"force": 0.15,
+		
+			":comment": "max force radius means that the gravity will fade out from that radius to both directions; inside and outside. meaning the center of the planet will have zero gravity like it should.",
+			"max_force_at_radius": 4000,
+			
+			":comment": "the radius when gravity has faded to zero outside of circle.",
+			"max_radius": 8000
+		},
+		"parallax": {
+			":path": "textures/parallax.png"
+		},
+		"lighting": {
+			"day": "FFFFFF",
+			"sunset": "666622",
+			"sunset_sky": "FFFF00",
+			"night": "666666",
+			"rain": "DDDDDD"
+		},
+		"sky": {
+			"space": {
+				":comment": "root_path is used to take images from the game shared assets.",
+				"root_path": "textures/stars/galaxy_stars.jpg",
+				":path": "textures/stars/stars.png",
+				"repeat": false,
+				"scale": 1,
+				"distance": 10
+			},
+			"clouds_back": {
+				"enabled": false,
+				":path": "textures/clouds/cloud-bg.jpg",
+				":comment": "always disabled at night"
+			},
+			"clouds_front": {
+				"enabled": false,
+				":path": "textures/clouds/cloud-layer.png",
+				"enabled_at_night": false
+			}
+		},
+		"water": {
+			"enabled": false,
+			"type": "water",
+			":comment": "choices: water, acid, lava, oil, void",
+			":back": "textures/water2.jpg",
+			":front": "textures/water2.jpg"
+		},
+		"rain": {
+			"type": "water",
+			":comment": "choices: water, acid, lava, oil, void",
+			":back": "textures/rainfall.png",
+			":front": "textures/rainfall.png",
+			":waterdroplets": "textures/raindrop-ripples-oneliner2.png",
+			":comment": "animated texture; w/h must be power of two. frame size = texture height x texture height"
+		}
+	},
+	
+	":comment": "0,0 coordinate is in middle of the map, so -w/2 is the left side, and -h/2 is the top side of map.",
+	":comment": "link = piece name where the unit relative coordinate is set to. if no link, then x/y is fixed to world coordinate (not recommended).",
+	":comment": "unit x/y coordinate is relative to link piece anchor_x/y coordinate.",
+	":comment": "d = distance, a = angle. used to create unit in circular fashion around x/y coordinate,",
+	":comment": "if x/y coordinate is missing, default is zero or link piece anchor x/y coordinate.",
+	":comment": "1970 was big planet radius, 997 for small planet.",
+	"units": [
+		{"owner":-1, "type":"antiair", "link":"planet1", "d":1970, "a":30},
+		{"owner":-1, "type":"antiair", "link":"planet1", "d":1970, "a":20},
+		{"owner":-1, "type":"antiair", "link":"planet1", "d":1970, "a":10},
+		{"owner":-1, "type":"antiair", "link":"planet1", "d":1970, "a":0},
+		{"owner":-1, "type":"antiair", "link":"planet1", "d":1970, "a":-10},
+		{"owner":-1, "type":"antiair", "link":"planet1", "d":1970, "a":-20},
+		{"owner":-1, "type":"antiair", "link":"planet1", "d":1970, "a":-30}
+	]
+}
