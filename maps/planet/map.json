@@ -17,8 +17,8 @@
 	"edge_thickness_y": 1000,  ":comment": "use y1/y2 if you want top/bottom to be different thicknesses.",
 	":comment": "this defines basically how short/long is the fading of clouds to stars texture at edges.",
 	"edge_health_loss_ratio": 10, ":comment": "how much hp you lose per frame when you are in the edge area.",
-	"teleport_from_edges_x": true, 
-	"teleport_from_edges_y": true, 
+	"teleport_from_edges_x": false, 
+	"teleport_from_edges_y": false, 
 	":comment": "x = left/right, y = top/bottom teleportation.",
 		
 	"mingameversion": "1.0.0",
