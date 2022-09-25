@@ -2,15 +2,19 @@
 <html lang="en">
 <head>
 	<title>Master Defender</title>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<meta charset="utf-8" />
+	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+	<meta http-equiv="Pragma" content="no-cache" />
+	<meta http-equiv="Expires" content="0" />
+
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
 	
-	<meta name="mobile-web-app-capable" content="yes">
-	<meta name="apple-mobile-web-app-capable" content="yes">
-	<meta name="apple-mobile-web-app-status-bar-style" content="black">
+	<meta name="mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black" />
 	
-	<meta property="og:title" content="Master Defender">
-	<meta property="og:description" content="Defend your ground by planes and soldiers!">
+	<meta property="og:title" content="Master Defender" />
+	<meta property="og:description" content="Defend your ground by planes and soldiers!" />
 	
 	<script src="three.js"></script>
 	<script src="FileSaver.js"></script>
@@ -1796,7 +1800,7 @@ let MAP_Y2 = MAP_H/2;
 let teleport_from_edges_x = true;
 let teleport_from_edges_y = false;
 
-let DEV_MODE = 1;
+let DEV_MODE = 0;
 
 
 let edgePadX = 0; // padding areas after which player would teleport
@@ -7093,6 +7097,7 @@ function spawn_turret(unit){
 	turret['alive'] = true;
 	turret['x'] = x;
 	turret['z'] = z;
+	turret['rotation'] = rotation;
 	turret['ammo'] = 1000;
 	turret['shoot_start'] = -1;
 	turret['health'] = 400;
@@ -7718,7 +7723,25 @@ function onDocumentKeyDown(event){
 			change_player(keyCode-49);
 			
 		}else if(keyCode == 55){ // '7'
-			change_player(keyCode-49);
+			for(let i = 0; i < turrets.length; i++){
+				let turret = turrets[i];
+				console.warn("rot = "+turret.mesh.rotation.z+", "+turret.rotation);
+			}
+			/*
+index.html:7728 rot = 0.48017623551401645, 27.512071717432974
+onDocumentKeyDown @ index.html:7728
+index.html:7728 rot = 0.30170921101040904, 17.286664431118425
+onDocumentKeyDown @ index.html:7728
+index.html:7728 rot = 0.12543925110992366, 7.187139673880353
+onDocumentKeyDown @ index.html:7728
+index.html:7728 rot = -0.048910958349728334, -2.8023914853795873
+onDocumentKeyDown @ index.html:7728
+index.html:7728 rot = -0.22168202472369655, -12.701444410582582
+onDocumentKeyDown @ index.html:7728
+index.html:7728 rot = -0.3932191824171394, -22.529799576086916
+onDocumentKeyDown @ index.html:7728
+index.html:7728 rot = -0.5638350392205435, -32.30536808893038
+			*/
 			
 		}else if(keyCode == 56){ // '8'
 			DEV_MODE ^= 1;
