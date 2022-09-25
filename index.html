@@ -896,7 +896,6 @@ var ZIN = -ZINSTEP*total_layers;
 // create new Z-index value
 function NEWZIN(){
 	ZIN += ZINSTEP;
-	console.log("zin = "+(ZIN-ZINSTEP));
 	return ZIN-ZINSTEP;
 }
 // randomized zin value is needed to avoid rendering glitches when zin values are exactly same.
@@ -4393,9 +4392,20 @@ function pre_init(){
 	console.warn("renderer.capabilities:");
 	console.warn(renderer.capabilities);
 	
-	renderer.domElement.addEventListener('webglcontextrestored', (e) => {
-		push_message("ERROR: GL CONTEXT LOST. BROWSER RESTART NEEDED!", true, -1);
+	renderer.domElement.addEventListener('webglcontextlost', (e) => {
+		push_message("ERROR: GL CONTEXT LOST. BROWSER RESTART NEEDED!", true, 20000);
 	}, false);
+	
+	renderer.domElement.addEventListener('webglcontextrestored', (e) => {
+		push_message("GL CONTEXT RESTORED", true);
+	}, false);
+	
+	/*
+THREE.WebGLRenderer: Context Lost.
+THREE.WebGLRenderer: Context Restored.
+
+TODO: handle restored in such a way that it will stop spamming messages.
+	*/
 
 	console.log("maxTextureSize = "+MAX_TEX_SIZE);
 		
