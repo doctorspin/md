@@ -4393,19 +4393,14 @@ function pre_init(){
 	console.warn(renderer.capabilities);
 	
 	renderer.domElement.addEventListener('webglcontextlost', (e) => {
-		push_message("ERROR: GL CONTEXT LOST. BROWSER RESTART NEEDED!", true, 20000);
+		push_message("ERROR: GL CONTEXT LOST. BROWSER RESTART MAY BE REQUIRED TO CONTINUE.", true, 20000);
 	}, false);
 	
 	renderer.domElement.addEventListener('webglcontextrestored', (e) => {
 		push_message("GL CONTEXT RESTORED", true);
 	}, false);
 	
-	/*
-THREE.WebGLRenderer: Context Lost.
-THREE.WebGLRenderer: Context Restored.
 
-TODO: handle restored in such a way that it will stop spamming messages.
-	*/
 
 	console.log("maxTextureSize = "+MAX_TEX_SIZE);
 		
@@ -5017,6 +5012,54 @@ function get_gravity_angle(x,z){
 		// no idea why needs 90 degree change..
 		return 90-get_angle(0,0,kx,kz);
 	}else{
+		return 0;
+	}
+}
+
+
+function get_gravity_angle_debug(x,z){
+	console.warn("----------------------------------------------");
+	console.warn("Gravity for unit position: "+x.toFixed(3)+","+z.toFixed(3)+":");
+	if(GRAVITY.style == GRAVITY_CIRCULAR){
+		let kx = 0;
+		let kz = 0;
+		for(let i = 0; i < GRAVITY.points.length; i++){
+			//a = get_angle(cpx, cpz, GRAVITY.point.x, GRAVITY.point.z);
+			let dire = new get_kxy(x, z, GRAVITY.points[i].x, GRAVITY.points[i].z);
+
+			let dist = get_dist_2d(x, z, GRAVITY.points[i].x, GRAVITY.points[i].z);
+			if(dist < GRAVITY.points[i].minradius){
+				dist = GRAVITY.points[i].minradius;
+			}
+			console.warn("--------------------");
+			console.warn("GRAVITY x = "+GRAVITY.points[i].x.toFixed(3));
+			console.warn("GRAVITY z = "+GRAVITY.points[i].z.toFixed(3));
+			console.warn("dist = "+dist.toFixed(3));
+			console.warn("dist^2 = "+(dist*dist).toFixed(3));
+			
+			let force = GRAVITY.value * (6000000/(dist*dist));
+			
+			console.warn("force = "+force.toFixed(3));
+			
+			console.warn("dire.x = "+dire.x.toFixed(3));
+			console.warn("dire.z = "+dire.z.toFixed(3));
+			console.warn("dire.x*force = "+(dire.x*force).toFixed(3));
+			console.warn("dire.z*force = "+(dire.z*force).toFixed(3));
+			
+			kx += dire.x*force;
+			kz += dire.z*force;
+			
+			console.warn("kx = "+kx.toFixed(3));
+			console.warn("kz = "+kz.toFixed(3));
+		}
+		//let a = get_angle(x, z, GRAVITY.point.x, GRAVITY.point.z);
+		// must be set after lookAt(), and as fixed value rather than addition/substraction.
+		// no idea why needs 90 degree change..
+		let out = 90-get_angle(0,0,kx,kz);
+		console.warn("angle = "+out);
+		return out;
+	}else{
+		console.error("WTF");
 		return 0;
 	}
 }
@@ -7020,7 +7063,7 @@ function spawn_turret(unit){
 	let sprite = SPRITES['turret'];
 
 
-	let rotation = get_gravity_angle(x,z);
+	let rotation = get_gravity_angle_debug(x,z);
 
 
 	let foundIndex = find_free_turret(type);
@@ -7735,7 +7778,7 @@ function onDocumentKeyDown(event){
 		}else if(keyCode == 55){ // '7'
 			for(let i = 0; i < turrets.length; i++){
 				let turret = turrets[i];
-				console.warn("rot = "+turret.mesh.rotation.z+", "+turret.rotation);
+				console.warn(i+" rot = "+turret.mesh.rotation.z.toFixed(6)+", "+turret.rotation.toFixed(3));
 			}
 			/*
 index.html:7728 rot = 0.48017623551401645, 27.512071717432974
