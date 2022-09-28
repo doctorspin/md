@@ -310,6 +310,9 @@ input[type=number] {
 			</td>
 		</tr>
 		</table>
+		<div>
+			<canvas id="output_image" width="1" height="1"></canvas>
+		</div>
 	</div>
 </div>
 
@@ -319,8 +322,12 @@ input[type=number] {
 
 let IMGS = null;
 let MINBOX = {};
-let CROP_OUTPUT_W = 1;
-let CROP_OUTPUT_H = 1;
+let CROP_OUTPUT_W = 0;
+let CROP_OUTPUT_H = 0;
+let PAD_OUTPUT_W = 0;
+let PAD_OUTPUT_H = 0;
+let OUTPUT_TEX_W = 0;
+let OUTPUT_TEX_H = 0;
 
 
 
@@ -632,8 +639,8 @@ function build_minbox(){
 function calculate_optimal_size(){
 	let w, h;
 	if($("#toggle_autocrop").is(":checked")){
-		w = (MINBOX.x2-MINBOX.x1)+1;
-		h = (MINBOX.y2-MINBOX.y1)+1;
+		w = MINBOX.w;
+		h = MINBOX.h;
 	}else{
 		w = OUTPUT_W;
 		h = OUTPUT_H;
@@ -641,7 +648,6 @@ function calculate_optimal_size(){
 	CROP_OUTPUT_W = w;
 	CROP_OUTPUT_H = h;
 	
-		
 	update_minbox_values();
 	
 	let padding = parseInt($("#frame_padding").val());
@@ -649,6 +655,9 @@ function calculate_optimal_size(){
 	//   also better this way because the image will be in middle.
 	w += padding*2;
 	h += padding*2;
+	
+	PAD_OUTPUT_W = w;
+	PAD_OUTPUT_H = h;
 	
 	console.log(w, h);
 			
@@ -707,6 +716,8 @@ function calculate_optimal_size(){
 		console.log(smallest_list);
 
 		let best = smallest_list[0];
+		OUTPUT_TEX_W = best.w;
+		OUTPUT_TEX_H = best.h;
 		console.log("best size: "+best.w+"x"+best.h);
 		
 		$("#outputsize").html(best.w+"x"+best.h);
@@ -787,8 +798,48 @@ $(document).ready(function(){
 
 $("#createsheet").click(function(){
 	if(!$(this).hasClass("disabled")){
-		let files = $("#fileList .imgfile");
-		console.log(files);
+		
+		let padding = parseInt($("#frame_padding").val());
+	
+		var canvas = document.getElementById("output_image");
+		canvas.width = OUTPUT_TEX_W;
+		canvas.height = OUTPUT_TEX_H;
+				
+		var ctx = canvas.getContext("2d");
+		
+
+		
+		let total_images = IMGS.length;
+		
+		let imgs_x = Math.floor(OUTPUT_TEX_W/PAD_OUTPUT_W);
+		let imgs_y = Math.floor(OUTPUT_TEX_H/PAD_OUTPUT_H);
+		
+		let curindex = 0;
+		let br = false;
+		for(let y = 0; y < imgs_y; y++){
+			for(let x = 0; x < imgs_x; x++){
+				
+				let xp = PAD_OUTPUT_W*x+padding;
+				let yp = PAD_OUTPUT_H*y+padding;
+				// 111222333444
+				
+				let img_id = $(IMGS[curindex]).data("imgid");
+				console.log(img_id);
+				let img = document.getElementById(img_id);
+				
+				ctx.drawImage(img, MINBOX.x1, MINBOX.y1, MINBOX.w, MINBOX.h, xp, yp, CROP_OUTPUT_W, CROP_OUTPUT_H)
+				
+				
+				
+				console.log("frame "+curindex+" = "+xp+","+yp);
+				curindex++;
+				if(curindex > total_images-1){
+					br = true;
+					break;
+				}
+			}
+			if(br) break;
+		}
 	}
 });
 
