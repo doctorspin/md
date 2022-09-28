@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Tools for MD</title>
+	<meta charset="utf-8" />
+	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+	<meta http-equiv="Pragma" content="no-cache" />
+	<meta http-equiv="Expires" content="0" />
+
+	<script src="FileSaver.js"></script>
+
+	<script type="text/javascript" src="jquery/jquery.min.js"></script>
+	<!-- seems like jquery UI sortable didnt work on the version in jquery folder by default, changed to 1.10.4: -->
+	<link type="text/css" href="jquery/jquery-ui_v1.10.4.css" rel="Stylesheet" />
+	<script type="text/javascript" src="jquery/jquery-ui_v1.10.4.js"></script>	
+</head>
+
+<body>
+
+<style>
+* {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-webkit-box-sizing: border-box;
+}
+
+body {
+	font:15px verdana;
+}
+
+img {
+	pointer-events: none; /* good to have so images cant be dragged and copied that way */
+}
+
+.hidden {
+	display:none;
+}
+
+.noselect {
+	-webkit-touch-callout: none;
+	  -webkit-user-select: none;
+	   -khtml-user-select: none;
+	     -moz-user-select: none;
+	      -ms-user-select: none;
+	          user-select: none;
+}
+
+.button {
+	border:2px solid rgba(80,80,255, 0.6);
+	border-radius: 10px;
+	padding: 5px;
+	background-color:rgba(0,0,200, 0.5);
+	display:inline-block;
+	cursor:pointer;
+	font-size:15px;
+	color:rgba(255,255,255,0.9);
+	
+	-webkit-touch-callout: none;
+	  -webkit-user-select: none;
+	   -khtml-user-select: none;
+	     -moz-user-select: none;
+	      -ms-user-select: none;
+	          user-select: none;
+}
+.button:hover {
+	background-color:rgba(0,0,200, 0.8);
+}
+.button.disabled {
+	background-color:rgba(120,120,120, 0.8);
+	border-color:rgba(80,80,80, 0.6);
+}
+.button.disabled:hover {
+	cursor:not-allowed;
+}
+</style>
+
+
+<style>
+table#holder {
+    border: 5px dashed rgba(40,40,40, 0.5);
+    background-color: rgba(40,40,40, 0.2);
+    font-family:Verdana;
+	height:200px;
+	text-align:center;
+}
+
+
+table#holder .imagefile {
+	width:50px;
+	height:50px;
+	display:inline-block;
+	background:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAK0lEQVQoz2P8+PEjAzbAx8eHVZyJgUQwqoEYwPj//3+sEp8+fRoNJfppAADrzwjvk8Sz/QAAAABJRU5ErkJggg==');
+	margin:1px;
+}
+
+table#holder .imagefile img {
+	width: 50px;
+	height: 50px;
+	object-fit: contain;
+}
+
+#anim_container {
+	width:200px;
+	height:200px;
+	display:inline-block;
+	background:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAK0lEQVQoz2P8+PEjAzbAx8eHVZyJgUQwqoEYwPj//3+sEp8+fRoNJfppAADrzwjvk8Sz/QAAAABJRU5ErkJggg==');
+	margin:1px;
+	
+	position: relative;
+	left: 0px;
+	top: 0px;
+}
+
+#animation_img {
+	width: 200px;
+	height: 200px;
+	object-fit: contain;
+	
+	position:relative;
+	left: 0px;
+	top: 0px;
+}
+
+
+#cropper {
+	width:200px;
+	height:200px;
+	border:1px solid black;
+	
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	mix-blend-mode: difference;
+	filter:invert(100%);
+}
+
+
+#fileList {
+	max-height:200px;
+	overflow-y:scroll;
+	font-size:0px; /* avoid paddings */
+}
+
+.form {
+	margin-bottom:20px;
+}
+.group {
+	margin-bottom:15px;
+}
+
+#outputfiles {
+	overflow-y:scroll;
+	border:1px solid black;
+	font:10px verdana;
+	padding-left:30px;
+	display:none;
+}
+
+.sizestr {
+	background-color:rgba(0,0,0, 0.1);
+	padding:2px;
+}
+.filetext {
+	--background-color:rgba(20,20,128, 0.3);
+	padding: 1px 1px 1px 5px;
+}
+.file_elem {
+	cursor:grab;
+	padding:3px;
+}
+.focused {
+	opacity:50%;
+}
+.delete {
+	font:bold 12px verdana;
+	color:red;
+    margin-left: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border: 1px outset gray;
+    background-color: rgba(0,0,0, 0.1);
+	border-radius:6px;
+}
+.delete:hover {
+	background-color:rgba(150,0,0, 0.3);
+	cursor:pointer;
+}
+#warnings {
+	font:bold 15px verdana;
+	color:red;
+}
+#editor {
+	display:none;
+}
+.left_cell {
+	width:350px;
+}
+.right_cell {
+	width:200px;
+}
+#sortgroup {
+	display:none;
+}
+#power_error {
+	font-weight:bold;
+	color:red;
+}
+
+input[type=number] {
+	width:70px;
+}
+</style>
+
+<div style="font:30px verdana">Sprite sheet generator</div>
+
+<div class="form">
+	<div class="group">
+		<table>
+		<tr>
+			<td class="left_cell">
+				<table id="holder" width="100%">
+				<tr>
+					<td>Drop images here<div id="total_files_processed"></div></td>
+				</tr>
+				<tr>
+					<td align="left"><div id="fileList" class="noselect"></div></td>
+				</tr>
+				</table>
+			</td>
+			<td class="right_cell"><ol id="outputfiles"></ol></td>
+		</tr>
+		<tr>
+			<td class="left_cell"><div id="loading_info"></div><span id="warnings"></span></td>
+			<td class="right_cell">
+				<div id="sortgroup">
+					Sort:
+					<div class="button sort">Asc</div>
+					<div class="button sort desc">Desc</div>
+				</div>
+			</td>
+		</tr>
+		</table>
+	</div>
+
+	<div id="editor">
+		<table>
+		<tr>
+			<td class="left_cell" valign="top">
+				<div class="group">
+					<div>Crop automatically:</div>
+					<input type="checkbox" value="1" id="toggle_autocrop" checked disabled> Yes
+				</div>
+				<div class="group">
+					<div>Cropping coordinates per image:</div>
+					<div><input type="number" name="crop_x1" id="crop_x1" placeholder="x" min="0"> , <input type="number" name="crop_y1" id="crop_y1" placeholder="y" min="0"> (top left)</div>
+					<div><input type="number" name="crop_x2" id="crop_x2" placeholder="x" min="0"> , <input type="number" name="crop_y2" id="crop_y2" placeholder="y" min="0"> (bottom right)</div>
+				</div>
+				<div class="group">
+					<div>Resize each cropped image to:</div>
+					<div><input type="number" name="to_width" id="to_width" placeholder="width" min="0"> x <input type="number" name="to_height" id="to_height" placeholder="height" min="0"></div>
+					<div><input type="checkbox" value="1" checked disabled> Keep aspect ratio</div>
+				</div>
+				<div class="group">
+					<div>Padding between frames:</div>
+					<div><input type="number" name="frame_padding" id="frame_padding" min="0" value="1"></div>
+				</div>
+				<!--
+				<div class="group">
+					<div>Use power of two output image size:</div>
+					<div><input type="checkbox" name="use_poweroftwo" id="use_poweroftwo" value="1" checked> Yes</div>
+				</div>
+				-->
+				<div class="group">
+					<div>Max size by power of two:</div>
+					<div><input type="number" name="maxpoweroftwo" id="maxpoweroftwo" value="13" min="1" max="19"> <span id="powsize"></span></div>
+					<div id="power_error" class="hidden"></div>
+				</div>
+				<!--
+				<div class="group">
+					<div>Use optimal texture size (any amount of columns/rows combinations with power of two sizes):</div>
+					<div><input type="checkbox" name="use_optimalsize" id="use_optimalsize" value="1" checked> Yes</div>
+				</div>
+				-->
+				<div class="group">
+					<div>Optimal output texture size:</div>
+					<div id="outputsize"></div>
+				</div>
+				
+				<div class="button disabled" id="createsheet">Create spritesheet</div>
+			</td>
+			<td class="right_cell" valign="top">
+				<div>
+					Animate: <input type="checkbox" value="1" id="toggle_animation" checked>
+				</div>
+				<div>
+					Frame delay: <input type="number" value="50" step="5" id="anim_speed">
+				</div>
+				<div>
+					Frame: <input type="number" value="0" step="1" id="current_frame">
+				</div>
+				<div>
+					Crop size: <span id="crop_size"></span>
+				</div>
+				<div>
+					Original size: <span id="original_size"></span>
+				</div>
+				<div>
+					<div id="anim_container"><img src="" id="animation_img" /><div id="cropper"></div></div>
+				</div>
+			</td>
+		</tr>
+		</table>
+	</div>
+</div>
+
+
+
+<script>
+
+let IMGS = null;
+let MINBOX = {};
+let CROP_OUTPUT_W = 1;
+let CROP_OUTPUT_H = 1;
+
+
+
+$("#crop_x1").change(function(){
+	MINBOX.x1 = parseInt($(this).val());
+	update_minbox_values();
+});
+$("#crop_y1").change(function(){
+	MINBOX.y1 = parseInt($(this).val());
+	update_minbox_values();
+});
+$("#crop_x2").change(function(){
+	MINBOX.x2 = parseInt($(this).val());
+	update_minbox_values();
+});
+$("#crop_y2").change(function(){
+	MINBOX.y2 = parseInt($(this).val());
+	update_minbox_values();
+});
+
+$("#to_width").change(function(){
+	let to_w = $("#to_width").val();
+	
+	if(parseInt($("#to_width").val()) <= 0){
+		to_w = "";
+		$("#to_width").val(to_w);
+	}
+	
+	if(to_w.length > 0){
+		to_w = parseInt(to_w);
+		// if width is set but height is not:
+		$("#to_height").val(to_w*MINBOX.h/MINBOX.w);
+	}
+});
+
+
+$("#to_height").change(function(){
+	let to_h = $("#to_height").val();
+
+	if(parseInt($("#to_height").val()) <= 0){
+		to_h = "";
+		$("#to_height").val(to_h);
+	}
+	
+	if(to_h.length > 0){
+		to_h = parseInt(to_h);
+		// if height is set but width is not:
+		$("#to_width").val(to_h*MINBOX.w/MINBOX.h);
+	}
+});
+
+
+$("#frame_padding").change(function(){
+	calculate_optimal_size();
+});
+
+$("#current_frame").change(function(){
+	frame = parseInt($("#current_frame").val());
+
+	if(frame > IMGS.length-1){
+		frame = 0;
+		$("#current_frame").val(frame);
+	}
+	if(frame < 0){
+		frame = IMGS.length-1;
+		$("#current_frame").val(frame);
+	}
+	stop_animation();
+	set_animation_frame();
+});
+
+function stop_animation(){
+	if(animator !== null){
+		clearInterval(animator);
+	}
+	$("#toggle_animation").prop("checked", false);
+}
+
+
+$("#toggle_animation").change(function(){
+	animate_enabled = $(this).is(':checked');
+	if(animate_enabled){
+		create_animator();
+	}else{
+		stop_animation();
+		set_animation_frame();
+	}
+});
+
+
+$("#anim_speed").change(function(){
+	if($("#toggle_animation").is(':checked')){
+		create_animator();
+	}
+});
+
+
+function get_power_size(){
+	return Math.pow(2, parseInt($("#maxpoweroftwo").val()));
+}
+
+function update_power_size(){
+	let powsize = get_power_size();
+	$("#powsize").html(" = "+powsize+"x"+powsize);
+}
+
+$("#maxpoweroftwo").change(function(){
+	update_power_size();
+	calculate_optimal_size();
+});
+
+function sort_by_size(a, b){
+	if (a.size < b.size) return -1;
+	if (a.size > b.size) return 1;
+	return 0;
+}
+function sort_by_dist(a, b){
+	if (a.dist < b.dist) return -1;
+	if (a.dist > b.dist) return 1;
+	return 0;
+}
+
+function sort_by_dist_width(a, b){
+	return (a.dist - b.dist) || (a.w - b.w);
+}
+
+function get_image_bounding_box(img_id){
+	let img = document.getElementById(img_id);//$("#"+img_id);
+	
+	var canvas = document.createElement("canvas");
+	canvas.width = img.naturalWidth;
+	canvas.height = img.naturalHeight;
+	
+	//console.log("canvas.width = "+canvas.width);
+	//console.log("canvas.height = "+canvas.height);
+	
+	var ctx = canvas.getContext("2d");
+	ctx.drawImage(img, 0, 0);
+	
+	const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+	//console.log("imageData.length = "+imageData.length);
+	
+	let minbox = {
+		x1: 0,
+		y1: 0,
+		x2: canvas.width-1,
+		y2: canvas.height-1,
+		w: canvas.width,
+		h: canvas.height,
+	};
+	let br;
+	
+	// find min y:
+	br = false;
+	for(let y = 0; y < canvas.height; y++){
+		for(let x = 0; x < canvas.width; x++){
+			if(imageData[y*canvas.width*4+x*4+3] > 0){
+				minbox.y1 = y;
+				br = true;
+				break;
+			}
+		}
+		if(br) break;
+	}
+	
+	// find max y:
+	br = false;
+	for(let y = canvas.height-1; y >= 0; y--){
+		for(let x = 0; x < canvas.width; x++){
+			if(imageData[y*canvas.width*4+x*4+3] > 0){
+				minbox.y2 = y;
+				br = true;
+				break;
+			}
+		}
+		if(br) break;
+	}
+
+	// find min x:
+	br = false;
+	for(let x = 0; x < canvas.width; x++){
+		for(let y = 0; y < canvas.height; y++){
+			if(imageData[y*canvas.width*4+x*4+3] > 0){
+				minbox.x1 = x;
+				br = true;
+				break;
+			}
+		}
+		if(br) break;
+	}
+	
+	// find max x:
+	br = false;
+	for(let x = canvas.width-1; x >= 0; x--){
+		for(let y = 0; y < canvas.height; y++){
+			if(imageData[y*canvas.width*4+x*4+3] > 0){
+				minbox.x2 = x;
+				br = true;
+				break;
+			}
+		}
+		if(br) break;
+	}
+	
+	return minbox;
+}
+
+
+
+function find_min_box(){
+	let minbox = {
+		x1: -1,
+		y1: -1,
+		x2: -1,
+		y2: -1,
+		w: -1,
+		h: -1,
+	};
+	
+	$("#loading_info").show();
+	
+	for(let i = 0; i < IMGS.length; i++){
+		let img_id = $(IMGS[i]).data("imgid");
+		//console.log("img_id:"+img_id);
+		$("#loading_info").text("Finding crop area: "+(i+1)+"/"+IMGS.length);
+		console.log("Finding crop area: "+(i+1)+"/"+IMGS.length);
+		
+		let box = get_image_bounding_box(img_id);
+		if(minbox.x1 == -1){
+			minbox.x1 = box.x1;
+			minbox.y1 = box.y1;
+			minbox.x2 = box.x2;
+			minbox.y2 = box.y2;
+		}else{
+			if(box.x1 < minbox.x1){
+				minbox.x1 = box.x1;
+			}
+			if(box.y1 < minbox.y1){
+				minbox.y1 = box.y1;
+			}
+			if(box.x2 > minbox.x2){
+				minbox.x2 = box.x2;
+			}
+			if(box.y2 > minbox.y2){
+				minbox.y2 = box.y2;
+			}
+		}
+	}
+	let w = (minbox.x2-minbox.x1)+1;
+	let h = (minbox.y2-minbox.y1)+1;
+	minbox.w = w;
+	minbox.h = h;
+	return minbox;
+}
+
+
+function update_minbox_values(){
+
+	$("#loading_info").text("").hide();
+	
+	console.log("minbox:");console.log(MINBOX);
+	
+	MINBOX.w = (MINBOX.x2-MINBOX.x1)+1;
+	MINBOX.h = (MINBOX.y2-MINBOX.y1)+1;
+	
+	$("#crop_x1").val(MINBOX.x1);
+	$("#crop_y1").val(MINBOX.y1);
+	$("#crop_x2").val(MINBOX.x2);
+	$("#crop_y2").val(MINBOX.y2);
+	
+	$("#crop_size").html(MINBOX.w+"x"+MINBOX.h);
+	$("#original_size").html(OUTPUT_W+"x"+OUTPUT_H);
+
+	$("#to_width").val(MINBOX.w);
+	$("#to_height").val(MINBOX.h);
+	
+	let max_w, max_h = 1;
+	let preview_max_w = 200;
+	let preview_max_h = 200;
+	if(OUTPUT_W > OUTPUT_H){
+		max_w = preview_max_w;
+		max_h = preview_max_h*(OUTPUT_H/OUTPUT_W);
+	}else{
+		max_w = preview_max_w*(OUTPUT_W/OUTPUT_H);
+		max_h = preview_max_h;
+	}
+	let off_x = (preview_max_w-max_w)/2;
+	let off_y = (preview_max_h-max_h)/2;
+	
+	let crop_w = ((MINBOX.w/OUTPUT_W)*max_w).toFixed(2);
+	let crop_h = ((MINBOX.h/OUTPUT_H)*max_h).toFixed(2);
+	let crop_left = ((MINBOX.x1/OUTPUT_W)*max_w+off_x).toFixed(2);
+	let crop_top = ((MINBOX.y1/OUTPUT_H)*max_h+off_y).toFixed(2);
+	$("#cropper").css("width", crop_w+"px");
+	$("#cropper").css("height", crop_h+"px");
+	$("#cropper").css("left", crop_left+"px");
+	$("#cropper").css("top", crop_top+"px");
+}
+
+
+
+function build_minbox(){
+	MINBOX = find_min_box();
+	
+	update_minbox_values();
+}
+
+
+function calculate_optimal_size(){
+	let w, h;
+	if($("#toggle_autocrop").is(":checked")){
+		w = (MINBOX.x2-MINBOX.x1)+1;
+		h = (MINBOX.y2-MINBOX.y1)+1;
+	}else{
+		w = OUTPUT_W;
+		h = OUTPUT_H;
+	}
+	CROP_OUTPUT_W = w;
+	CROP_OUTPUT_H = h;
+	
+		
+	update_minbox_values();
+	
+	let padding = parseInt($("#frame_padding").val());
+	// add padding to both sides of image; better that way since then pixel colors wont overflow from frame to frame.
+	//   also better this way because the image will be in middle.
+	w += padding*2;
+	h += padding*2;
+	
+	console.log(w, h);
+			
+	let maxpower = parseInt($("#maxpoweroftwo").val());
+	console.log("maxpower = "+maxpower);
+	
+	let total_images = IMGS.length;
+	console.log("IMGS.length = "+IMGS.length);
+	//console.log("w = "+w);
+	//console.log("h = "+h);
+	let possible_sizes = [];
+	
+	for(let x = 0; x <= maxpower; x++){
+		for(let y = 0; y <= maxpower; y++){
+			let output_w = Math.pow(2, x);
+			let output_h = Math.pow(2, y);
+			
+			if(output_w >= w && output_h >= h){
+				let frames_per_w = Math.floor(output_w/w);
+				let frames_per_h = Math.floor(output_h/h);
+				let total_frames_possible = frames_per_w*frames_per_h;
+				
+
+				if(total_images <= total_frames_possible){
+					possible_sizes.push({
+						'w': output_w, 
+						'h': output_h,
+						'size': output_w*output_h,
+						'ratio': output_w/output_h,
+						'dist': Math.sqrt(output_w*output_w + output_h*output_h),
+					});
+				}
+			}
+		}
+	}
+			
+	console.log("possible_sizes");
+	console.log(possible_sizes);
+	
+	if(possible_sizes.length > 0){
+		possible_sizes.sort(sort_by_size);
+
+		let smallest = possible_sizes[0].size;
+		let smallest_list = [];
+		for(let i = 0; i < possible_sizes.length; i++){
+			let elem = possible_sizes[i];
+			if(elem.size != smallest){
+				break;
+			}
+			smallest_list.push(elem);
+		}
+		
+		smallest_list.sort(sort_by_dist_width);
+		
+		console.log("smallest_list");
+		console.log(smallest_list);
+
+		let best = smallest_list[0];
+		console.log("best size: "+best.w+"x"+best.h);
+		
+		$("#outputsize").html(best.w+"x"+best.h);
+		
+		$("#power_error").html("");
+		$("#power_error").hide();
+		
+		$("#createsheet").removeClass("disabled");
+	}else{
+		let powsize = get_power_size();
+		let power_str = powsize+"x"+powsize;
+		
+		$("#outputsize").html("");
+		
+		$("#power_error").html("Cannot fit images to "+power_str+" !");
+		$("#power_error").show();
+		
+		$("#createsheet").addClass("disabled");
+	}
+}
+
+
+
+
+
+let alphanumeric = "abcdefghijklmnopqrstuvwxyz0123456789";
+function random_str(len){
+	let out = "";
+	for(let i = 0; i < len; i++){
+		out += alphanumeric[Math.floor(Math.random()*alphanumeric.length)];
+	}
+	return out;
+}
+
+
+function create_image_element(path, onload_callback){
+	let id = "img_"+random_str(20);
+	var img = $('<img id="'+id+'">');
+	img.attr('src', path);
+	img.appendTo('#imagecache');
+	
+	$("#"+id).load(function(){
+		console.log(id);
+	});
+	return img;
+}
+
+
+
+function create_images(folder, basename_format, amount, startfrom){
+	let out = [];
+	if(typeof startfrom === "undefined"){
+		startfrom = 1;
+	}
+	let num = startfrom;
+	for(let i = 0; i < amount; i++){
+		let filename = folder + basename_format.replaceAll("{n}", num);
+		console.log("creating");
+		let img = create_image_element(filename, function(){console.log("loaded "+filename);});
+		num++;
+		out.push(img);
+	}
+}
+
+
+
+$(function() {
+	$("#outputfiles").sortable();
+});
+
+$(document).ready(function(){
+
+	console.log("ready");
+	update_power_size();
+	//let images = create_images("sprites/airplane/texture/", "{n}.png", 29);
+	//process_images(images);
+});
+
+$("#createsheet").click(function(){
+	if(!$(this).hasClass("disabled")){
+		let files = $("#fileList .imgfile");
+		console.log(files);
+	}
+});
+
+
+
+
+$(document).on("click", ".delete", function(e){
+	let file_id = $(this).data("fileid");
+	let img_id = $(this).data("imgid");
+	
+	$("#"+file_id).remove();
+	$("#"+img_id).parent().remove();
+});
+
+
+$(document).on("click", ".imagefile", function(e){
+	frame = $(this).index();
+	$("#current_frame").val(frame);
+	stop_animation();
+	set_animation_frame();
+});
+
+
+
+$(".sort").click(function(){
+	if(!$(this).hasClass("disabled")){
+		let mylist = $('#outputfiles');
+		let imglist = $("#fileList");
+		
+		let listitems = mylist.children('li').get();
+		let imglistitems = imglist.children('span').get();
+		
+		//console.log("listitems");console.log(listitems);
+		//console.log("imglistitems");console.log(imglistitems);
+		
+		let desc = $(this).hasClass("desc");
+		
+		let desc_sort = function(a, b){
+			var A = $(a).data("name").toUpperCase();
+			var B = $(b).data("name").toUpperCase();
+			return B.localeCompare(A, false, {
+				numeric: true
+			});
+		};
+		let asc_sort = function(a, b){
+			var A = $(a).data("name").toUpperCase();
+			var B = $(b).data("name").toUpperCase();
+			return A.localeCompare(B, false, {
+				numeric: true
+			});
+		};
+		
+		if(desc){
+			listitems.sort(desc_sort);
+			imglistitems.sort(desc_sort);
+		}else{
+			listitems.sort(asc_sort);
+			imglistitems.sort(asc_sort);
+		}
+		
+		$.each(listitems, function(idx, itm){
+			mylist.append(itm);
+		});
+		$.each(imglistitems, function(idx, itm){
+			imglist.append(itm);
+		});
+		
+	}
+});
+
+
+
+
+
+let prev_w = 0;
+let prev_h = 0;
+let total_files = 0;
+let total_image_files = 0;
+let processed = 0;
+let global_id = 0;
+let warnings_found = false;
+
+let animate_enabled = true;
+
+let animator = null;
+let frame = 0;
+let prev_img_id = null;
+let prev_file_id = null;
+let loaded_images = 0;
+
+let OUTPUT_W = 0;
+let OUTPUT_H = 0;
+
+$('#holder').on({
+	'dragover dragenter': function(e) {
+		e.preventDefault();
+		e.stopPropagation();
+	},
+	'drop': function(e) {
+		var dataTransfer = e.originalEvent.dataTransfer;
+		if( dataTransfer && dataTransfer.files.length) {
+			e.preventDefault();
+			e.stopPropagation();
+			
+			let already_uploaded_count = $("#fileList .imgfile").length;
+			//console.log("already_uploaded_count = "+already_uploaded_count);
+
+			total_image_files = 0;
+			loaded_images = 0;
+			
+			$.each(dataTransfer.files, function(i, file){
+				if(file.type.match('image.*')){
+					total_image_files++;
+				}
+			});
+			total_files = total_image_files + already_uploaded_count;
+			
+			
+			$.each(dataTransfer.files, function(i, file){ 
+				var reader = new FileReader();
+		
+				reader.onload = $.proxy(function(file, $fileList, event){
+					if(file.type.match('image.*')){
+						let img_id = "uploaded_"+global_id;
+						let framenum = global_id;
+						var img = $("<img src='"+event.target.result+"' class='imgfile' data-name='"+file.name+"' id='"+img_id+"'/>");
+						global_id++;
+						
+						img.load(function(){
+							let w = $(this).prop("naturalWidth");
+							let h = $(this).prop("naturalHeight");
+							
+							loaded_images++;
+							
+							if(processed > 0){
+								if(w != prev_w || h != prev_h){
+									$("#warnings").html("ERROR: images are not same size!");
+									warnings_found = true;
+								}
+							}
+							prev_w = w;
+							prev_h = h;
+							processed++;
+							
+							let curfiles = $("#fileList .imagefile");
+							let cur_processed = curfiles.length;
+							
+							$("#total_files_processed").html("Processed: "+cur_processed+"/"+total_files);
+							
+							$("#outputfiles").css("height", $("#holder").outerHeight());
+							
+							//if(cur_processed == total_files){
+							if(loaded_images == total_image_files){
+								console.log("loaded_images = "+loaded_images);
+								console.log("total_image_files = "+total_image_files);
+								console.log("cur_processed = "+cur_processed);
+								console.log("total_files = "+total_files);
+								console.log("finished processing last file: "+cur_processed);
+								
+								$("#outputfiles").empty();
+								
+								if(!warnings_found){
+
+									$.each(curfiles, function(i, elem){
+										let img_id = $(this).data("id");
+										let	elem_id = "fileid_"+img_id;
+										let w = $("#"+img_id).prop("naturalWidth");
+										let h = $("#"+img_id).prop("naturalHeight");
+										OUTPUT_W = w;
+										OUTPUT_H = h;
+										let size_str = w+"x"+h;
+										
+										//console.log("size_str", w,h);
+					
+										$("#outputfiles").append("<li class='file_elem' id='"+elem_id+"' data-fileid='"+elem_id+"' data-imgid='"+img_id+"' data-name='"+$(this).data('name')+"'><span class='sizestr'>"+size_str+"</span><span class='filetext'>"+$(this).data('name')+"</span><span class='delete' data-fileid='"+elem_id+"' data-imgid='"+img_id+"' title='Delete item'>x</span></li>");
+									});
+									
+									$("#outputfiles").show();
+									$("#createsheet").removeClass("disabled");
+									$("#editor").show();
+									$("#sortgroup").show();
+									
+									IMGS = document.getElementById("outputfiles").children;
+									build_minbox();
+									
+									console.log("calculate_optimal_size", OUTPUT_W, OUTPUT_H);
+									calculate_optimal_size();
+	
+									create_animator();
+						
+								}else{
+									$("#outputfiles").hide();
+									$("#createsheet").addClass("disabled");
+									$("#editor").hide();
+									$("#sortgroup").hide();
+								}
+							}
+						});
+	
+						$fileList.append($("<span class='imagefile' data-name='"+file.name+"' data-id='"+img_id+"' title='"+file.name+"'>").append(img));
+						
+					}else{
+						console.log("invalid image file format: '"+file.name+"'");
+					}
+				}, this, file, $("#fileList"));
+				reader.readAsDataURL(file);
+			});
+		}
+	}
+});
+
+
+
+function set_animation_frame(){
+
+	let img_id = $(IMGS[frame]).data("imgid");
+	let file_id = $(IMGS[frame]).data("fileid");
+
+	let img = $("#"+img_id);
+	let file = $("#"+file_id);
+	
+	if(prev_img_id !== null){
+		$("#"+prev_img_id).removeClass("focused");
+	}
+	img.addClass("focused");
+	
+	if(prev_file_id !== null){
+		$("#"+prev_file_id).removeClass("focused");
+	}
+	file.addClass("focused");
+	
+	prev_img_id = img_id;
+	prev_file_id = file_id;
+	let img_src = img.attr("src");
+	// todo: src is baase64 encoded data... slow to update.
+	//       should make it so the images are shown/hidden only, so no useless data changes.
+	$("#animation_img").attr("src", img_src);
+}
+
+
+function create_animator(){
+	let anim_speed = parseInt($("#anim_speed").val());
+	stop_animation();
+	
+	$("#toggle_animation").prop("checked", true);
+
+	animator = setInterval(function(){
+		set_animation_frame();
+		$("#current_frame").val(frame);
+		
+		frame++;
+		if(frame > IMGS.length-1){
+			frame = 0;
+		}
+	}, anim_speed);
+}
+
+
+</script>
+
+</body>
+</html>
