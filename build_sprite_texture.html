@@ -351,31 +351,33 @@ $("#crop_y2").change(function(){
 $("#to_width").change(function(){
 	let to_w = $("#to_width").val();
 	
-	if(parseInt($("#to_width").val()) <= 0){
-		to_w = "";
-		$("#to_width").val(to_w);
-	}
-	
 	if(to_w.length > 0){
 		to_w = parseInt(to_w);
 		// if width is set but height is not:
 		$("#to_height").val(to_w*MINBOX.h/MINBOX.w);
+		
+		to_w = parseFloat($("#to_width").val());
+		to_h = to_w*MINBOX.h/MINBOX.w;
+		
+		calculate_optimal_size(to_w, to_h);
 	}
+	
+	
 });
 
 
 $("#to_height").change(function(){
 	let to_h = $("#to_height").val();
 
-	if(parseInt($("#to_height").val()) <= 0){
-		to_h = "";
-		$("#to_height").val(to_h);
-	}
-	
 	if(to_h.length > 0){
 		to_h = parseInt(to_h);
 		// if height is set but width is not:
 		$("#to_width").val(to_h*MINBOX.w/MINBOX.h);
+		
+		to_w = to_h*MINBOX.w/MINBOX.h;
+		to_h = parseFloat($("#to_height").val());
+		
+		calculate_optimal_size(to_w, to_h);
 	}
 });
 
@@ -601,9 +603,7 @@ function update_minbox_values(){
 	$("#crop_size").html(MINBOX.w+"x"+MINBOX.h);
 	$("#original_size").html(OUTPUT_W+"x"+OUTPUT_H);
 
-	$("#to_width").val(MINBOX.w);
-	$("#to_height").val(MINBOX.h);
-	
+
 	let max_w, max_h = 1;
 	let preview_max_w = 200;
 	let preview_max_h = 200;
@@ -633,18 +633,26 @@ function build_minbox(){
 	MINBOX = find_min_box();
 	
 	update_minbox_values();
+	
+	$("#to_width").val(MINBOX.w);
+	$("#to_height").val(MINBOX.h);
+	
 }
 
 
-function calculate_optimal_size(){
-	let w, h;
-	if($("#toggle_autocrop").is(":checked")){
-		w = MINBOX.w;
-		h = MINBOX.h;
-	}else{
-		w = OUTPUT_W;
-		h = OUTPUT_H;
+function calculate_optimal_size(w,h){
+	if(typeof w === "undefined" && typeof h === "undefined"){
+		if($("#toggle_autocrop").is(":checked")){
+			w = MINBOX.w;
+			h = MINBOX.h;
+			console.log("calculate optimal size: use cropping");
+		}else{
+			w = OUTPUT_W;
+			h = OUTPUT_H;
+			console.log("calculate optimal size: no crop");
+		}
 	}
+	
 	CROP_OUTPUT_W = w;
 	CROP_OUTPUT_H = h;
 	
@@ -800,6 +808,10 @@ $("#createsheet").click(function(){
 	if(!$(this).hasClass("disabled")){
 		
 		let padding = parseInt($("#frame_padding").val());
+		let to_w = Math.round(parseFloat($("#to_width").val()));
+		let to_h = Math.round(parseFloat($("#to_height").val()));
+		let to_w2 = to_w+padding*2;
+		let to_h2 = to_h+padding*2;
 	
 		var canvas = document.getElementById("output_image");
 		canvas.width = OUTPUT_TEX_W;
@@ -811,25 +823,21 @@ $("#createsheet").click(function(){
 		
 		let total_images = IMGS.length;
 		
-		let imgs_x = Math.floor(OUTPUT_TEX_W/PAD_OUTPUT_W);
-		let imgs_y = Math.floor(OUTPUT_TEX_H/PAD_OUTPUT_H);
+		let imgs_x = Math.floor(OUTPUT_TEX_W/to_w2);
+		let imgs_y = Math.floor(OUTPUT_TEX_H/to_h2);
 		
 		let curindex = 0;
 		let br = false;
+
 		for(let y = 0; y < imgs_y; y++){
 			for(let x = 0; x < imgs_x; x++){
-				
-				let xp = PAD_OUTPUT_W*x+padding;
-				let yp = PAD_OUTPUT_H*y+padding;
-				// 111222333444
+				let xp = to_w2*x;
+				let yp = to_h2*y;
 				
 				let img_id = $(IMGS[curindex]).data("imgid");
-				console.log(img_id);
 				let img = document.getElementById(img_id);
 				
-				ctx.drawImage(img, MINBOX.x1, MINBOX.y1, MINBOX.w, MINBOX.h, xp, yp, CROP_OUTPUT_W, CROP_OUTPUT_H)
-				
-				
+				ctx.drawImage(img, MINBOX.x1, MINBOX.y1, MINBOX.w, MINBOX.h, xp+padding, yp+padding, to_w, to_h);
 				
 				console.log("frame "+curindex+" = "+xp+","+yp);
 				curindex++;
