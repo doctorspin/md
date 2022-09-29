@@ -16,7 +16,12 @@
 	<meta property="og:title" content="Master Defender" />
 	<meta property="og:description" content="Defend your ground by planes and soldiers!" />
 	
+	<!--
 	<script src="three.js"></script>
+	-->
+	<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+	<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.145.0/build/three.module.js"}}</script>
+
 	<script src="FileSaver.js"></script>
 
 	<link type="text/css" href="jquery/jquery-ui.css" rel="Stylesheet" />
@@ -28,9 +33,7 @@
 
 	<!-- Google tag (gtag.js) -->
 	<script async src="https://www.googletagmanager.com/gtag/js?id=G-7HEP5RL9MR"></script>
-<script>
-window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-7HEP5RL9MR');
-</script>
+	<script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-7HEP5RL9MR');</script>
 
 <!--
 24.9.
@@ -275,8 +278,9 @@ html, body {
 
 
 </style>
-<script>
 
+
+<script>
 
 
 
@@ -464,14 +468,10 @@ var CURRENT_TYPE = "";
 var LOCKED = {};
 
 
-
-
-
-
-
-
-
 </script>
+
+
+
 
 <style>
 * {
@@ -496,7 +496,7 @@ body {
 	position:absolute;
 	top:0;
 	left:0;
-	font:1vmax courier;
+	font:12px verdana;
 	padding:4px 4px 4px 10px;
 	background-color:rgba(0,0,0, 0.5);
 	text-shadow: 0 0 3px #000000, 0 0 2px #000000, 0 0 1px #000000;
@@ -507,7 +507,7 @@ body {
 	bottom:0;
 	left:0;
 	width: 100%;
-	font:1vmax courier;
+	font:12px verdana;
 	padding:4px 4px 4px 10px;
 	background-color:rgba(0,0,0, 0.5);
 	text-shadow: 0 0 3px #000000, 0 0 2px #000000, 0 0 1px #000000;
@@ -826,9 +826,12 @@ class Perlin {
 
 <div id="imagecache"></div>
 
-<script>
+
+<script type="module">
 "use strict";
 
+
+import * as THREE from 'three';
 
 
 
@@ -983,12 +986,15 @@ var Z_RAIN = NEWZIN(); // rain texture.
 
 
 
-var urlprefix = ""; // possibly used when using server to host files: "https://md.com/" etc.
+var urlprefix = ""; // possibly used when using (node.js) server to host files at url such as "https://md.com/".
 
 var MAP_NAME = "planet";
+var MOD_NAME = "default";
 //var MAP_NAME = "highmap";
 var MAP_FOLDER = urlprefix+'maps/'+MAP_NAME;
-var MAP_DATA_URL = MAP_FOLDER+'/map.json'+randomVersion();
+var MOD_FOLDER = urlprefix+'mods/'+MOD_NAME;
+var MAP_DATA_URL = MAP_FOLDER+'/map.json'+randomVersion(); // add randomversion to make sure it is always re-downloaded.
+var MOD_DATA_URL = MOD_FOLDER+'/mod.json'+randomVersion(); // add randomversion to make sure it is always re-downloaded.
 
 
 var GRAVITY_PLANAR = 0; // default
@@ -1229,7 +1235,7 @@ var SPRITES = {
 	'plane_spin': {
 		'anims': {
 			'spin_to_down': ranged(1, 14),
-			'spin_to_up':   ranged(15, 29),
+			'spin_to_up':   ranged(14, 29),
 		},
 	},
 };
@@ -1603,9 +1609,10 @@ var COLLISION_DATA = {
 };
 
 
-let map_defaults = {}; // default map settings which will be combined with map settings.json.
+let map_defaults = {}; // default map settings which will be combined with map.json.
 let mapinfo = {};
-
+let mod_defaults = {}; // default mod settings which will be combined with mod.json.
+let modinfo = {};
 
 var OWNER_AI = -1; // ai owner id.
 
@@ -1665,6 +1672,7 @@ var gameLoadedVar = false;
 
 // list of things loaded or not. game wont start until all are loaded.
 var loaded = {
+	mod_settings: false,
 	map_settings: false,
 	glowsprite: false,
 	nightsky: false,
@@ -1857,6 +1865,8 @@ var texturePlayerCube;
 var textureSpaceCube;
 var textureCrystalCube;
 
+let reflectionMap;
+
 
 
 
@@ -1868,28 +1878,8 @@ function getTimeMillis(){
 }
 
 
-function startCountdownTimer(){
-	countdownTimeStart = getTimeMillis();
-}
-
-function displayEndingScores(){
-	$('#players-ending-scores').removeClass("hidden");
-	$('#players').addClass("hidden");
-}
-
-function hideEndingScores(){
-	$('#players-ending-scores').addClass("hidden");
-	$('#players').removeClass("hidden");
-}
 
 
-function getPlayerScale(playerIndex){
-	var scale = 1+players[playerIndex].score/10.0;
-	if(scale > 3){
-		scale = 3;
-	}
-	return scale;
-}
 
 
 
@@ -1930,7 +1920,7 @@ function get_kxy_angle(angle){
 	this.x = Math.sin((angle-90.0)*(Math.PI/180.0));
 	this.z = Math.cos((angle-90.0)*(Math.PI/180.0));
 }
-function get_kxy_rads(rads){
+function get_kxy_angle_rads(rads){
 	this.x = Math.sin(rads);
 	this.z = Math.cos(rads);
 }
@@ -2051,34 +2041,6 @@ function sort_by_score(a, b){
 	return 0;
 }
 
-function updateScoreTable(){
-	var html = "";
-	var scoretable = [];
-	for(var i = 0; i < players.length; i++){
-		var playerName = players[i].nick;
-		var playerScore = players[i].score;
-		var bgStyle = "";
-		if(i == myPlayer){
-			bgStyle = '; border:1px dashed rgba(255,255,255, 0.25); margin:-1px';
-		}
-		scoretable.push({
-			'name': playerName,
-			'score': playerScore,
-			'style': 'color:'+players[i].color+bgStyle,
-		});
-	}
-
-	scoretable.sort(sort_by_score);
-	var html = '<table id="ending-score-table" cellspacing="0" cellpadding="0" border="0">';
-	for(var i = 0; i < scoretable.length; i++){
-		var num = i+1;
-		html += '<tr style="'+scoretable[i].style+'"><td class="num">'+num+'.</td><td class="nam" style="'+scoretable[i].style+'">'+scoretable[i].name+'</td><td class="sco">'+scoretable[i].score+'</td></tr>';
-	}
-	html += '</table>';
-	
-	$('#scores').html(html);
-	$('#ending-scores').html(html);
-}
 
 
 
@@ -2093,9 +2055,7 @@ function updateInfo(){
 	$('#player-z').html(zpos.toFixed(1));
 	$('#player-angle').html(angle.toFixed(1));
 }
-function updateScoreCount(){
-	$('#player-y').html(players[myPlayer].score);
-}
+
 
 
 // set_speed
@@ -2122,56 +2082,11 @@ function setShootAngle(i){
 
 
 
-// addscore()
-function addPlayerScore(playerIndex, score){
-	var prevScore = players[playerIndex].score;
-	players[playerIndex].score += score;
-	
-	
-	if(players[playerIndex].score < 0){
-		players[playerIndex].score = 0;
-	}
-	//var scale = getPlayerScale(playerIndex);
-	//players[playerIndex].mesh.scale.set(scale,scale,scale);
-	
-	if(playerIndex == myPlayer){
-		updateScoreCount();
-	}
-	
-	updateScoreTable();
-}
 
 
 
 
 
-
-
-
-function getGameTimeLeft(){
-	if(gameStartTime == -1){
-		return gameMaxTimeSecs;
-	}
-	var retval = gameMaxTimeSecs-((getTimeMillis()-gameStartTime)/1000.0);
-	if(retval < 0){
-		retval = 0;
-	}
-	return retval;
-}
-
-
-
-function initTimer(){
-	gameStartTime = getTimeMillis();
-	prevFpsTime = getTimeMillis();
-}
-
-function init_gui(){
-
-	set_loading_desc("Initializing GUI");
-	
-	updateScoreTable();
-}
 
 
 function resetVars(){
@@ -2183,10 +2098,7 @@ function resetVars(){
 	gameEnded = false; // someone won now.
 	prevEndingState = -1;
 
-	
-	
 
-	init_gui();
 }
 
 
@@ -2551,6 +2463,8 @@ function correct_texture_size(image){
 		return image;
 	}
 	
+	console.warn("resizing image to power of two size: "+image.src);
+	
 	const canvas = document.createElement('canvas');
 	const context = canvas.getContext('2d');
 
@@ -2812,7 +2726,7 @@ function create_fading_plane_mesh(plane_w, plane_h, material, f_top, f_bottom, f
 	var geometry = new THREE.PlaneBufferGeometry(plane_w, plane_h, 3, 3);
 	var count = geometry.attributes.position.count;
 	let BPP = 4;
-	geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(count*BPP), BPP));
+	geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count*BPP), BPP));
 	
 	let mesh = new THREE.Mesh(geometry, material);
 	mesh.visible = SHOW_WAVE_BG;
@@ -2832,18 +2746,18 @@ function create_fading_plane_mesh(plane_w, plane_h, material, f_top, f_bottom, f
 	
 	
 	//for(let y = 0; y < Y_VERT; y++){}
-	/*
-	for(var i = 0, c = 0; i <= vertices.length; i += 3, c+=BPP){
-		vertices[i+2] = Z_SKYBOX+5;
+	
+	//for(var i = 0, c = 0; i <= vertices.length; i += 3, c+=BPP){
+		//vertices[i+2] = Z_SKYBOX+5;
 	
 		// default color to white:
-		colors[c+0] = 1;
-		colors[c+1] = 1;
-		colors[c+2] = 1;
-		colors[c+3] = 1;
+		//colors[c+0] = 1;
+		//colors[c+1] = 1;
+		//colors[c+2] = 1;
+		//colors[c+3] = 1;
 
-	}
-	*/
+	//}
+	
 	mesh.geometry.attributes.position.needsUpdate = true;
 	
 	//console.log("mesh.geometry.attributes");
@@ -2851,6 +2765,7 @@ function create_fading_plane_mesh(plane_w, plane_h, material, f_top, f_bottom, f
 	mesh.geometry.attributes.color.needsUpdate = true;
 	return mesh;
 }
+
 
 
 
@@ -3259,7 +3174,8 @@ function load_map_water(path){
 function load_map_collision(path){
 	return new THREE.TextureLoader().load(path, function(tex){
 		tex.image = correct_texture_size(tex.image);
-		
+		console.warn("GRAVITY.points", stringify(GRAVITY.points));
+		console.warn("loaded", stringify(loaded));
 		set_loading_desc("Map loaded");
 		
 
@@ -3310,6 +3226,12 @@ function load_map_collision(path){
 					'range': planet.range,
 					'minradius': planet.minradius,
 				});
+				console.warn("gravity.points.push", {
+					'x': planet.x,
+					'z': planet.y,
+					'range': planet.range,
+					'minradius': planet.minradius,
+				});
 				
 				let mesh = new THREE.Mesh(geometry, material);
 
@@ -3346,6 +3268,9 @@ function load_map_collision(path){
 		}
 		
 		loaded.map = true;
+		console.warn("GRAVITY.points", stringify(GRAVITY.points));
+		console.warn("loaded", stringify(loaded));
+		
 	});
 }
 
@@ -3652,6 +3577,9 @@ function load_map(){
 
 
 
+function load_mod(){
+	
+}
 
 
 
@@ -3670,6 +3598,24 @@ function pre_init(){
 	
 	// DATA FILES:
 	
+	// load mod settings:
+	$.getJSON(MOD_DATA_URL, function(json){
+		loaded.mod_settings = true;
+		
+		console.log("MOD SETTINGS:");
+		console.log(json);
+		
+		// combine map_defaults with map settings.json:
+		modinfo = Object.assign(mod_defaults, json);
+		
+		load_mod();
+		
+	}).fail(function(){
+		console.error("ERROR: Could not read file: '"+MOD_DATA_URL+"'! File may be missing or incorrectly formatted (JSON is strict format, commas cannot be in end of lines unless another item comes after. All keys must be surrounded by double quotes, and all strings must be surrounded by double quotes).");
+	});
+	
+	
+	// load map settings:
 	$.getJSON(MAP_DATA_URL, function(json){
 		loaded.map_settings = true;
 		
@@ -3681,7 +3627,6 @@ function pre_init(){
 		
 		// todo: should load all map textures etc after map settings are loaded!
 		load_map();
-	
 		
 	}).fail(function(){
 		console.error("ERROR: Could not read file: '"+MAP_DATA_URL+"'! File may be missing or incorrectly formatted (JSON is strict format, commas cannot be in end of lines unless another item comes after. All keys must be surrounded by double quotes, and all strings must be surrounded by double quotes).");
@@ -3738,11 +3683,25 @@ function pre_init(){
 
 	// reflective bumpy cloud mapping:
 	textureCube = new THREE.CubeTextureLoader().load(urls);
-	textureCube.format = THREE.RGBFormat;
+	textureCube.format = THREE.RGBAFormat;
 	textureCube.mapping = THREE.CubeReflectionMapping;
 
 
+	//reflectionMap = new 
+/*
+	new RGBELoader().setPath('textures/envmaps/').load('royal_esplanade_1k.hdr', function(tex){
+		tex.mapping = THREE.EquirectangularReflectionMapping;
 
+		//scene.background = tex;
+		scene.environment = tex;
+
+		//render();
+
+		// model
+
+
+	});
+*/
 
 	// load main map texture: (map_path map_plane) load_map
 	set_loading_desc("Loading map pieces");
@@ -3854,8 +3813,8 @@ function pre_init(){
 
 			let mesh = new THREE.Mesh(geometry, material);
 			let mscale = 1;
-			mesh.position.x = 0;
-			mesh.position.z = -4200;
+			mesh.position.x = 2973;
+			mesh.position.z = -1183;
 			mesh.position.y = Z_SOLDIER;
 
 			mesh.rotation.x = -Math.PI/2;
@@ -4198,13 +4157,13 @@ function pre_init(){
 		
 		let scale = 3;
 
-		let mesh_w = 322/scale;//97;
-		let mesh_h = 246/scale;//53;
+		let mesh_w = (399+2)/scale;//97;
+		let mesh_h = (304+2)/scale;//53;
 
 		let tex_frame_w = mesh_w*scale;
 		let tex_frame_h = mesh_h*scale;
 		
-		let frames_x = 6;//3
+		let frames_x = 5;//3
 
 		let sprite_name = 'plane_spin';
 		initialize_sprite(sprite_name, tex_frame_w, tex_frame_h, tex.image.width, tex.image.height, frames_x);
@@ -4268,6 +4227,9 @@ function pre_init(){
 
 		material.normalMap = planeNormalTex;
 		material.normalScale = new THREE.Vector2(1, 1);
+		
+		material.metalness = 1.0;
+		material.envMap = textureCube;
 	
 		
 		let mesh = new THREE.Mesh(geometry, material);
@@ -4315,9 +4277,9 @@ function pre_init(){
 		return material;
 	}
 
-
 	// create map plane:
 	{
+	
 		set_loading_desc("Generating reflection layer");
 		
 		var mapMaterial = new THREE.MeshLambertMaterial( { envMap: textureCube } );
@@ -4327,8 +4289,8 @@ function pre_init(){
 		var geometry = new THREE.PlaneBufferGeometry( mapsize, mapsize, terrainVerts, terrainVerts );
 		var count = geometry.attributes.position.count;
 	
-		let BPP = 4; // need buildAlphaMaterial() finished to alpha channel to work.
-		geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(count*BPP), BPP));
+		let BPP = 3; // need buildAlphaMaterial() finished to alpha channel to work.
+		geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count*BPP), BPP));
 		
 		terrain = new THREE.Mesh(geometry, mapMaterial);
 		terrain.visible = SHOW_WAVE_BG;
@@ -4349,39 +4311,40 @@ function pre_init(){
 		
 		// flatten the terrain:
 		vertices = terrain.geometry.attributes.position.array;
-		var colors = terrain.geometry.attributes.color.array;
+		//var colors = terrain.geometry.attributes.color.array;
 		for(var i = 0, c = 0; i <= vertices.length; i += 3, c+=BPP){
 			vertices[i+2] = Z_SKYBOX+5;
 		
+		
 			// default color to white:
-			colors[c+0] = 1.16;//1.2+(Math.random())*0.5;//Math.random()*3;
-			colors[c+1] = 1.16;//1.2+(Math.random())*0.5;//Math.random()*3;
-			colors[c+2] = 1.10;//1.2+(Math.random())*0.5;
+			//colors[c+0] = 1.16;//1.2+(Math.random())*0.5;//Math.random()*3;
+			//colors[c+1] = 1.16;//1.2+(Math.random())*0.5;//Math.random()*3;
+			//colors[c+2] = 1.10;//1.2+(Math.random())*0.5;
 			
 			// stretch edge + fade to black:
 			if(vertices[i+0] <= -mapsize/2){
 				vertices[i+0] = -mapsize;
-				colors[c+0] = 0;
-				colors[c+1] = 0;
-				colors[c+2] = 0;
+				//colors[c+0] = 0;
+				//colors[c+1] = 0;
+				//colors[c+2] = 0;
 			}
 			if(vertices[i+0] >= mapsize/2){
 				vertices[i+0] = mapsize;
-				colors[c+0] = 0;
-				colors[c+1] = 0;
-				colors[c+2] = 0;
+				//colors[c+0] = 0;
+				//colors[c+1] = 0;
+				//colors[c+2] = 0;
 			}
 			if(vertices[i+1] <= -mapsize/2){
 				vertices[i+1] = -mapsize;
-				colors[c+0] = 0;
-				colors[c+1] = 0;
-				colors[c+2] = 0;
+				//colors[c+0] = 0;
+				//colors[c+1] = 0;
+				//colors[c+2] = 0;
 			}
 			if(vertices[i+1] >= mapsize/2){
 				vertices[i+1] = mapsize;
-				colors[c+0] = 0;
-				colors[c+1] = 0;
-				colors[c+2] = 0;
+				//colors[c+0] = 0;
+				//colors[c+1] = 0;
+				//colors[c+2] = 0;
 			}
 		}
 		terrain.geometry.attributes.position.needsUpdate = true;
@@ -4393,6 +4356,8 @@ function pre_init(){
 		scene.add(terrain);
 		
 		set_loading_desc("Reflection layer loaded");
+		
+		
 	}
 	
 
@@ -4468,11 +4433,9 @@ function pre_init(){
 
 	window.addEventListener('resize', onWindowResize, false);
 
-	
-	
+
 	set_loading_desc("Initialization done");
-		
-	init_gui();
+
 }
 
 
@@ -4756,6 +4719,9 @@ function reset_globals(){
 	
 }
 
+function stringify(obj){
+	return JSON.stringify(obj);
+}
 
 
 
@@ -4791,10 +4757,13 @@ function game_loaded(){
 	//SCREEN_MID_Y = CANVAS_H/2;//renderlayer.height/2;
 	
 
+	console.warn("game loaded.");
+	console.warn(stringify(GRAVITY));
 	
 	set_loading_desc("Post-initialization");
 		
 	console.log("game loaded... post initializating...");
+	
 	post_init();
 
 	let game_loading_time = (getTimeMillis()-loading_start_time)/1000;

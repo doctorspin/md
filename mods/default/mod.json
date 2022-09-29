@@ -1,0 +1,49 @@
+{
+	":FORMATTING_NOTICES": "use ':comment' as key to add comments. add ':' before the key if wanting to remove that key temporarily. each string and key name must be using double quotes. last item in array or object must not have a comma in the end.",
+	"name": "Default",
+	"desc": "Alpha version, mainly for testing.",
+
+	"modversion": "0.1.0",
+	":comment": "major = big changes to gameplay, minor = small changes to gameplay, patch = bugfixes.",
+	":comment": "should be at minimum 0.1.0 for first version. 1.0.0 means it is no longer alpha/beta version and is ready to be published.",
+	":comment": "note: if the original mod differs too much from newest version, it might be smarter to change the mod name.",
+	
+	"units": [
+		{
+			"name": "airplane",
+			"frame_size_x": 399,
+			"frame_size_y": 304,
+			"frame_padding": 1, ":comment": "the frame padding used when generating spritesheet",
+			"scale": 3,
+			"frames_x": 5, ":comment": "how many frames are in x axis of the texture",
+			":comment": "frame sizes are in pixels. frame size+padding is divided by scale to get physical size in-game.",
+			
+			"anims": {
+				"spin_to_down": {"start": 1, "end": 14},
+				"spin_to_up":   {"start": 14, "end": 29},
+				":comment": "start/end = frame numbers of spritesheet. frames are (with the generator) added to spritesheet from left to right, top to bottom.",
+				":comment": "end of anims"
+			},
+			
+			"textures": {
+				"main": {
+					"path": "sprites/airplane/texture.png"
+				},
+				"normalmap": {
+					"path": "sprites/airplane/normalmap.png"
+				},
+				":lightmap": {
+					"path": "sprites/airplane/lightmap.png"
+				},
+				":specularmap_not_yet_supported": {
+					"path": "sprites/airplane/specularmap.png"
+				},
+				":comment": "end of textures"
+			},
+
+			":comment": "end of unit properties"
+		}
+	],
+	
+	":comment": "end of modinfo"
+}
