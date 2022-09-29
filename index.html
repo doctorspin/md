@@ -925,6 +925,7 @@ var Z_MAP_WATERDROPS = NEWZIN();
 var Z_MAP_BG = NEWZIN(); // map texture (back layer / map background parallax).
 
 
+var Z_MAP_LIGHT = NEWZIN();
 
 
 var Z_MAP_BEHIND = NEWZIN(); // map sprites layer
@@ -1073,13 +1074,13 @@ var TEXTURES = {
 	'santa_lights_sprite_url': 	{path: "sprites/SantaSleigh-lights3c.png", 
 								config: default_texture_config},
 								
-	'plane_sprite_url': 		{path: "sprites/airplane_3d.png", 
+	'plane_sprite_url': 		{path: "sprites/airplane/texture.png", 
 								config: default_texture_config},
 								
 	'plane_lights_sprite_url': 	{path: "sprites/--airplane_lights.png", 
 								config: default_texture_config},
 								
-	'plane_normalmap': 			{path: "sprites/--airplane_normalmap.png", 
+	'plane_normalmap': 			{path: "sprites/airplane/normalmap.png", 
 								config: default_texture_config},
 								
 	'helicopter_test_url': 		{path: "sprites/helicopter_2x.png", 
@@ -1227,8 +1228,8 @@ var SPRITES = {
 	},
 	'plane_spin': {
 		'anims': {
-			'spin_to_down': ranged(1, 36),
-			'spin_to_up':   ranged(37, 72),
+			'spin_to_down': ranged(1, 14),
+			'spin_to_up':   ranged(15, 29),
 		},
 	},
 };
@@ -3715,9 +3716,9 @@ function pre_init(){
 	ambient = new THREE.AmbientLight(0xffffff);
 	scene.add(ambient);
 	
-	let light = new THREE.PointLight(0xffffff, 2);
-	light.position.set(0, Z_MINZIN, 0);
-	scene.add( light );
+	let light = new THREE.PointLight(0xffffff, 1);
+	light.position.set(0, Z_MAP_LIGHT, 0);
+	scene.add(light);
 		
 	//let targetObject = new THREE.Object3D(0,10000,0);
 	//scene.add(targetObject);
@@ -4197,13 +4198,13 @@ function pre_init(){
 		
 		let scale = 3;
 
-		let mesh_w = 256/scale;//97;
-		let mesh_h = 196/scale;//53;
+		let mesh_w = 322/scale;//97;
+		let mesh_h = 246/scale;//53;
 
 		let tex_frame_w = mesh_w*scale;
 		let tex_frame_h = mesh_h*scale;
 		
-		let frames_x = 8;//3
+		let frames_x = 6;//3
 
 		let sprite_name = 'plane_spin';
 		initialize_sprite(sprite_name, tex_frame_w, tex_frame_h, tex.image.width, tex.image.height, frames_x);
@@ -6308,7 +6309,7 @@ function render(renderFrame){
 
 		if(plane_flipping){
 
-			let speedAdd = 1;
+			let speedAdd = 0.5;
 			planeFrameIndex += speedAdd;
 			
 			let sprite_name = 'plane_spin';
