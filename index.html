@@ -5035,6 +5035,8 @@ function get_gravity_angle(x,z){
 function get_gravity_angle_debug(x,z){
 	console.warn("----------------------------------------------");
 	console.warn("Gravity for unit position: "+x.toFixed(3)+","+z.toFixed(3)+":");
+	console.warn("total "+GRAVITY.points.length+" gravity points:");
+	console.warn(GRAVITY);
 	if(GRAVITY.style == GRAVITY_CIRCULAR){
 		let kx = 0;
 		let kz = 0;
