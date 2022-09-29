@@ -3,7 +3,7 @@
 	"name": "Planet",
 	
 	"mapversion": "1.0.0",
-	":comment": "patch = bugfixes, minor = small changes to gameplay, major = big changes to gameplay.",
+	":comment": "major = big changes to gameplay, minor = small changes to gameplay, patch = bugfixes.",
 	":comment": "should be at minimum 0.1.0 for first version. 1.0.0 means it is no longer alpha/beta version and is ready to be published.",
 	":comment": "note: if the original map differs too much from newest version, it might be smarter to change the map name.",
 	
@@ -21,7 +21,7 @@
 	"teleport_from_edges_y": false, 
 	":comment": "x = left/right, y = top/bottom teleportation.",
 
-		
+
 	"mingameversion": "1.0.0",
 	":comment": "refers to game version string",
 	":comment": "at which game version this map was designed for.",
