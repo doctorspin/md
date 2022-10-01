@@ -1093,10 +1093,10 @@ var TEXTURES = {
 	'santa_lights_sprite_url': 	{path: "sprites/SantaSleigh-lights3c.png", 
 								config: default_texture_config},
 								
-	'plane_sprite_url': 		{path: "sprites/complane/texture-1024.png", 
+	'plane_sprite_url': 		{path: "sprites/complane/texture-1024.webp", 
 								config: default_texture_config},
 								
-	'plane_normalmap': 			{path: "sprites/complane/normalmap-1024.png", 
+	'plane_normalmap': 			{path: "sprites/complane/normalmap-1024.webp", 
 								config: default_texture_config},
 								
 	'plane_lights_sprite_url': 	{path: "sprites/--airplane_lights.png", 
@@ -4306,8 +4306,8 @@ Padding between frames
 		mesh.position.z = -4150;
 		mesh.position.y = Z_PLANE;
 
-		mesh.rotation.x = Math.PI/2;
-		mesh.scale.set(mscale,mscale,mscale);
+		mesh.rotation.x = -Math.PI/2;
+		mesh.scale.set(-mscale,mscale,mscale);
 	
 		var i = add_player(mesh, TYPE_PLANE);
 		change_player(i);
@@ -6095,11 +6095,10 @@ function render(renderFrame){
 				if(tilt_speed > max_tilt_speed) tilt_speed = max_tilt_speed;
 				if(tilt_speed < -max_tilt_speed) tilt_speed = -max_tilt_speed;
 				let tilt_angle = (-tilt_speed/max_tilt_speed)*max_tilt_angle;
-				player.mesh.rotation.z = deg2rad(tilt_angle+180);
+				player.mesh.rotation.z = deg2rad(tilt_angle);
 			}else{
-				player.mesh.rotation.z = deg2rad(player.angle+180);
+				player.mesh.rotation.z = deg2rad(player.angle);
 				//player.mesh.rotation.z = deg2rad(gangle);
-				
 			}
 			
 
