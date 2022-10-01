@@ -230,7 +230,7 @@ input[type=number] {
 			<td class="right_cell"><ol id="outputfiles"></ol></td>
 		</tr>
 		<tr>
-			<td class="left_cell"><div id="loading_info"></div><span id="warnings"></span></td>
+			<td class="left_cell"><div class="button sort" id="clear_images">Clear images</div><div id="loading_info"></div><span id="warnings"></span></td>
 			<td class="right_cell">
 				<div id="sortgroup">
 					Sort:
@@ -248,7 +248,7 @@ input[type=number] {
 			<td class="left_cell" valign="top">
 				<div class="group">
 					<div>Crop automatically:</div>
-					<input type="checkbox" value="1" id="toggle_autocrop" checked disabled> Yes
+					<input type="checkbox" value="1" id="toggle_autocrop" checked> Yes
 				</div>
 				<div class="group">
 					<div>Cropping coordinates per image:</div>
@@ -321,7 +321,14 @@ input[type=number] {
 <script>
 
 let IMGS = null;
-let MINBOX = {};
+let MINBOX = {
+	x1: -1,
+	y1: -1,
+	x2: -1,
+	y2: -1,
+	w: -1,
+	h: -1,
+};
 let CROP_OUTPUT_W = 0;
 let CROP_OUTPUT_H = 0;
 let PAD_OUTPUT_W = 0;
@@ -329,6 +336,10 @@ let PAD_OUTPUT_H = 0;
 let OUTPUT_TEX_W = 0;
 let OUTPUT_TEX_H = 0;
 
+
+function stringify(obj){
+	return JSON.stringify(obj);
+}
 
 
 $("#crop_x1").change(function(){
@@ -540,6 +551,7 @@ function get_image_bounding_box(img_id){
 
 
 function find_min_box(){
+
 	let minbox = {
 		x1: -1,
 		y1: -1,
@@ -549,6 +561,7 @@ function find_min_box(){
 		h: -1,
 	};
 	
+
 	$("#loading_info").show();
 	
 	for(let i = 0; i < IMGS.length; i++){
@@ -630,7 +643,20 @@ function update_minbox_values(){
 
 
 function build_minbox(){
-	MINBOX = find_min_box();
+	if($("#toggle_autocrop").is(":checked")){
+		MINBOX = find_min_box();
+	}else{
+		if(MINBOX.x1 == -1){
+			MINBOX = {
+				x1: 0,
+				y1: 0,
+				x2: OUTPUT_W-1,
+				y2: OUTPUT_H-1,
+				w: OUTPUT_W,
+				h: OUTPUT_H,
+			};
+		}
+	}
 	
 	update_minbox_values();
 	
@@ -803,6 +829,16 @@ $(document).ready(function(){
 	//let images = create_images("sprites/airplane/texture/", "{n}.png", 29);
 	//process_images(images);
 });
+
+
+$("#clear_images").click(function(){
+	console.log(stringify(IMGS));
+	$("#outputfiles").empty();
+	$("#fileList").empty();
+	console.log(stringify(IMGS));
+});
+
+
 
 $("#createsheet").click(function(){
 	if(!$(this).hasClass("disabled")){
