@@ -832,10 +832,30 @@ $(document).ready(function(){
 
 
 $("#clear_images").click(function(){
-	console.log(stringify(IMGS));
 	$("#outputfiles").empty();
 	$("#fileList").empty();
-	console.log(stringify(IMGS));
+	hide_errors();
+	
+	stop_animation();
+
+	prev_w = 0;
+	prev_h = 0;
+	total_files = 0;
+	total_image_files = 0;
+	processed = 0;
+	global_id = 0;
+	warnings_found = false;
+
+	animate_enabled = true;
+
+	animator = null;
+	frame = 0;
+	prev_img_id = null;
+	prev_file_id = null;
+	loaded_images = 0;
+
+	OUTPUT_W = 0;
+	OUTPUT_H = 0;
 });
 
 
@@ -1061,10 +1081,7 @@ $('#holder').on({
 										$("#outputfiles").append("<li class='file_elem' id='"+elem_id+"' data-fileid='"+elem_id+"' data-imgid='"+img_id+"' data-name='"+$(this).data('name')+"'><span class='sizestr'>"+size_str+"</span><span class='filetext'>"+$(this).data('name')+"</span><span class='delete' data-fileid='"+elem_id+"' data-imgid='"+img_id+"' title='Delete item'>x</span></li>");
 									});
 									
-									$("#outputfiles").show();
-									$("#createsheet").removeClass("disabled");
-									$("#editor").show();
-									$("#sortgroup").show();
+									hide_errors();
 									
 									IMGS = document.getElementById("outputfiles").children;
 									build_minbox();
@@ -1075,10 +1092,7 @@ $('#holder').on({
 									create_animator();
 						
 								}else{
-									$("#outputfiles").hide();
-									$("#createsheet").addClass("disabled");
-									$("#editor").hide();
-									$("#sortgroup").hide();
+									show_errors();
 								}
 							}
 						});
@@ -1096,6 +1110,23 @@ $('#holder').on({
 });
 
 
+function hide_errors(){
+	$("#outputfiles").show();
+	$("#createsheet").removeClass("disabled");
+	$("#editor").show();
+	$("#sortgroup").show();
+	warnings_found = false;
+	
+	$("#warnings").html("");
+}
+
+function show_errors(){
+	$("#outputfiles").hide();
+	$("#createsheet").addClass("disabled");
+	$("#editor").hide();
+	$("#sortgroup").hide();
+	warnings_found = true;
+}
 
 function set_animation_frame(){
 
