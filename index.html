@@ -38,6 +38,13 @@
 	<script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-7HEP5RL9MR');</script>
 
 <!--
+30.9.
+- shots center position is at the tip of the shot instead of the center of the shot.
+
+29.9.
+- finished sprite sheet genereator.
+- added detailed plane texture/normalmap test from 3d model.
+
 24.9.
 - converted planet textures to webp format to be able to upload to github, and probably keep using webp in future since it saves a lot of space.
 
@@ -1082,13 +1089,13 @@ var TEXTURES = {
 	'santa_lights_sprite_url': 	{path: "sprites/SantaSleigh-lights3c.png", 
 								config: default_texture_config},
 								
-	'plane_sprite_url': 		{path: "sprites/airplane/texture.png", 
+	'plane_sprite_url': 		{path: "sprites/complane/texture-90.png", 
+								config: default_texture_config},
+								
+	'plane_normalmap': 			{path: "sprites/complane/normalmap-90.png", 
 								config: default_texture_config},
 								
 	'plane_lights_sprite_url': 	{path: "sprites/--airplane_lights.png", 
-								config: default_texture_config},
-								
-	'plane_normalmap': 			{path: "sprites/airplane/normalmap.png", 
 								config: default_texture_config},
 								
 	'helicopter_test_url': 		{path: "sprites/helicopter_2x.png", 
@@ -1235,9 +1242,15 @@ var SPRITES = {
 		},
 	},
 	'plane_spin': {
+		'maxframes': 30,
 		'anims': {
-			'spin_to_down': ranged(1, 14),
-			'spin_to_up':   ranged(14, 29),
+			'spin_to_down': ranged(1, 15),
+			'spin_to_up':   ranged(15, 30),
+			
+			'to_90':  ranged(1, 8),
+			'to_180': ranged(8, 15),
+			'to_270': ranged(15, 23),
+			'to_360': ranged(23, 30),
 		},
 	},
 };
@@ -1868,6 +1881,7 @@ var textureSpaceCube;
 var textureCrystalCube;
 
 let reflectionMap;
+let reflectionCube;
 
 
 
@@ -3585,6 +3599,14 @@ function load_mod(){
 
 
 
+function get_cubemap_urls(path, s){
+	let p = urlprefix + path; // add prefix
+	return [p+"px"+s, p+"nx"+s, p+"py"+s, p+"ny"+s, p+"pz"+s, p+"nz"+s];
+}
+
+
+
+
 function pre_init(){
 
 	loading_start_time = getTimeMillis();
@@ -3682,14 +3704,25 @@ function pre_init(){
 	var r = urlprefix+"textures/clouds/cloud-bg.jpg";
 	var urls = [r, r, r, r, r, r];
 	
-
 	// reflective bumpy cloud mapping:
 	textureCube = new THREE.CubeTextureLoader().load(urls);
 	textureCube.format = THREE.RGBAFormat;
 	textureCube.mapping = THREE.CubeReflectionMapping;
 
 
-	//reflectionMap = new 
+	{
+		//let r = urlprefix+"textures/stars/galaxy_stars_squared.png";
+		//let urls = [r, r, r, r, r, r];
+		
+		
+		// for objects reflections (cloudy stars):
+		reflectionCube = new THREE.CubeTextureLoader().load(get_cubemap_urls("textures/cubemaps/reflection1/", ".png"));
+		//reflectionCube = new THREE.CubeTextureLoader().load(urls);
+		reflectionCube.format = THREE.RGBAFormat;
+		reflectionCube.mapping = THREE.CubeReflectionMapping;
+	}
+
+
 /*
 	new RGBELoader().setPath('textures/envmaps/').load('royal_esplanade_1k.hdr', function(tex){
 		tex.mapping = THREE.EquirectangularReflectionMapping;
@@ -3824,7 +3857,7 @@ function pre_init(){
 			
 			var i = add_player(mesh, TYPE_SOLDIER);
 			soldierPlayer = i;
-			change_player(i);
+			
 			scene.add(players[i].mesh);
 		}
 		
@@ -4157,15 +4190,38 @@ function pre_init(){
 		loaded.plane = true;
 		set_loading_desc("Plane loaded");
 		
-		let scale = 3;
-
-		let mesh_w = (399+2)/scale;//97;
-		let mesh_h = (304+2)/scale;//53;
-
+		// "airplane"
+		//let scale = 6;
+		//let mesh_w = (798+2)/scale;//399;
+		//let mesh_h = (608+2)/scale;//304;
+		//let frames_x = 5;
+		
+		// "complane"
+		let scale = 1;
+		let mesh_w = (464+2)/scale;//399;
+		let mesh_h = (510+2)/scale;//304;
+		let frames_x = 4;
+/*
+dinates per image:
+35
+ , 
+0
+ (top left)
+500
+ , 
+511
+ (bottom right)
+Resize each cropped image to:
+464
+ x 
+509,80257510729615
+ Keep aspect ratio
+*/
+	
 		let tex_frame_w = mesh_w*scale;
 		let tex_frame_h = mesh_h*scale;
 		
-		let frames_x = 5;//3
+
 
 		let sprite_name = 'plane_spin';
 		initialize_sprite(sprite_name, tex_frame_w, tex_frame_h, tex.image.width, tex.image.height, frames_x);
@@ -4230,8 +4286,10 @@ function pre_init(){
 		material.normalMap = planeNormalTex;
 		material.normalScale = new THREE.Vector2(1, 1);
 		
-		material.metalness = 1.0;
-		material.envMap = textureCube;
+		material.reflectivity = 0.2; // shininess / metalness
+		//material.specular = new THREE.Color(0x333333);
+		material.envMap = reflectionCube;
+		//material.envMap = textureCube;
 	
 		
 		let mesh = new THREE.Mesh(geometry, material);
@@ -4244,12 +4302,11 @@ function pre_init(){
 		mesh.scale.set(mscale,mscale,mscale);
 	
 		var i = add_player(mesh, TYPE_PLANE);
-		
+		change_player(i);
 		scene.add(players[i].mesh);
 
 	});
 
-	
 	// todo: add rgba possibility here...
 	function buildAlphaMaterial(params){
 		const material = new THREE.MeshLambertMaterial(params);
@@ -4970,6 +5027,8 @@ var shooting_imprecision = 0.5; // in degrees.
 var frameTime_val = getTimeMillis();
 var frameNumber_val = 0;
 
+let ANGLE_MULTI = 1;
+
 var rotatePlayer = 0;
 
 var prevShootStartTime = 0;
@@ -5007,7 +5066,8 @@ function get_gravity_angle_debug(x,z){
 	console.warn("----------------------------------------------");
 	console.warn("Gravity for unit position: "+x.toFixed(3)+","+z.toFixed(3)+":");
 	console.warn("total "+GRAVITY.points.length+" gravity points:");
-	console.warn(GRAVITY);
+	console.warn(stringify(GRAVITY.points));
+	
 	if(GRAVITY.style == GRAVITY_CIRCULAR){
 		let kx = 0;
 		let kz = 0;
@@ -5161,6 +5221,9 @@ function render(renderFrame){
 
 
 	
+	ANGLE_MULTI = key_down(16) ? 0.1 : 1;
+	
+	
 	if(curplayer.type == TYPE_HELI){
 		let helispeed_x = 0.2;
 		let helispeed_z = 0.1;
@@ -5196,11 +5259,11 @@ function render(renderFrame){
 		
 			
 			if(key_down(65)){ // 'A'
-				curplayer.angle += 4;
+				curplayer.angle += 4*ANGLE_MULTI;
 				setAngle(myPlayer, curplayer.angle);
 			}
 			if(key_down(68)){ // 'D'
-				curplayer.angle -= 4;
+				curplayer.angle -= 4*ANGLE_MULTI;
 				setAngle(myPlayer, curplayer.angle);
 			}
 			if(key_down(87)){ // 'W'
@@ -5221,11 +5284,11 @@ function render(renderFrame){
 			}
 		}else{
 			if(key_down(65)){ // 'A'
-				curplayer.angle += 2;
+				curplayer.angle += 2*ANGLE_MULTI;
 				setAngle(myPlayer, curplayer.angle);
 			}
 			if(key_down(68)){ // 'D'
-				curplayer.angle -= 2;
+				curplayer.angle -= 2*ANGLE_MULTI;
 				setAngle(myPlayer, curplayer.angle);
 			}
 			if(key_down(87)){ // 'W'
@@ -6287,7 +6350,8 @@ function render(renderFrame){
 			
 			let sprite_name = 'plane_spin';
 			
-			let animations = ['spin_to_down', 'spin_to_up'];
+			//let animations = ['spin_to_down', 'spin_to_up'];
+			let animations = ['to_90', 'to_180', 'to_270', 'to_360'];
 			let animation_name = animations[plane_current_flip_dir];
 			
 			let anim_frames = SPRITES[sprite_name]['anims'][animation_name].length;
@@ -6296,7 +6360,11 @@ function render(renderFrame){
 				if(animations.length > 1){
 					// if ran out of frames, set ready to continue from next animation:
 					planeFrameIndex = 0;
-					plane_current_flip_dir ^= 1;
+					//plane_current_flip_dir ^= 1;
+					plane_current_flip_dir++;
+					if(plane_current_flip_dir > animations.length-1){
+						plane_current_flip_dir = 0;
+					}
 					plane_flipping = 0;
 					
 					animation_name = animations[plane_current_flip_dir];
@@ -7191,13 +7259,9 @@ function drop_bomb(owner, x, z, dire, speed, owned_by_ai){
 	material.transparent = true;
 	material.opacity = 1;
 	material.side = THREE.DoubleSide;
-	//material.blending = THREE.AdditiveBlending;
 
 	let mesh = new THREE.Mesh(geometry, material);
 	let mscale = 1;
-	//mesh.position.x = 2117;
-	mesh.position.y = Z_MAP_BOMBS;
-	//mesh.position.z = 237;
 
 	let angle = get_angle(0, 0, dire.x, dire.z);
 	mesh.rotation.x = Math.PI/2;
@@ -7205,14 +7269,8 @@ function drop_bomb(owner, x, z, dire, speed, owned_by_ai){
 	
 	mesh.scale.set(mscale,mscale,mscale);
 	
-
-	
-	
-	//let dire = new get_kxy_angle(players[myPlayer].angle);
-	//let speed = 0.1*players[myPlayer].speed;
-
-	
 	mesh.position.x = x;
+	mesh.position.y = randomized_y(Z_MAP_BOMBS);
 	mesh.position.z = z;
 	
 	let bomb = {
@@ -7557,11 +7615,13 @@ function shoot_planegun_nosound(owner, x, z, bullet_angle, object_speed, type){
 	let h = 6;
 	
 	let geometry = new THREE.PlaneGeometry(w, h);
+	geometry.translate(-w/2, 0, 0);
 	let material = new THREE.MeshPhongMaterial({map: shotSpriteTest, color: 0xFFFFFF});  			
 	material.color.set(0xFFFFFF);
 	material.transparent = true;
 	material.opacity = 1;
 	material.side = THREE.DoubleSide;
+	
 	material.emissive.set(0xFFFF00);
 	material.emissiveMap = shotlightsTex;
 	material.emissiveIntensity = 0.7;
@@ -7573,7 +7633,7 @@ function shoot_planegun_nosound(owner, x, z, bullet_angle, object_speed, type){
 		mscale = 20; // for testing.
 	}
 	mesh.position.x = x;
-	mesh.position.y = Z_MAP_SHOTS;
+	mesh.position.y = randomized_y(Z_MAP_SHOTS);
 	mesh.position.z = z;
 
 	mesh.rotation.x = Math.PI/2;
@@ -7899,13 +7959,11 @@ $(window).bind('beforeunload', function(){
 document.addEventListener("mousemove", onDocumentMouseMove, false);
 function onDocumentMouseMove(event){
 	if(!game_paused && gameLoadedVar){
-
-
 		// update mouse pos only if not pressing SHIFT key.
 		// NOTE: DONT USE CTRL IN ANY COMBINATIONS SINCE CTRL+W QUITS PAGE.
 		// this way you can stop camera following mouse.
 		// todo: fix pointing direction being wrong if player not in middle of screen.
-		if(!key_down(16)){ // if not 'SHIFT'
+		//if(!key_down(16)){ // if not 'SHIFT'
 			MOUSE_X = event.clientX; // integers.
 			MOUSE_Y = event.clientY;
 					
@@ -7915,26 +7973,8 @@ function onDocumentMouseMove(event){
 			MOUSE_ANGLE = get_angle(SCREEN_MID_X, SCREEN_MID_Y, MOUSE_X, MOUSE_Y);
 			
 			MOUSE_DIST = get_dist_2d(SCREEN_MID_X, SCREEN_MID_Y, MOUSE_X, MOUSE_Y);
-		}
-		
-		//let angle = get_angle(SCREEN_MID_X, SCREEN_MID_Y, MOUSE_X, MOUSE_Y);
-		
-		/*
-		var dist = get_dist_2d(SCREEN_MID_X, SCREEN_MID_Y, MOUSE_X, MOUSE_Y);
-		
-		var maxDistX = SCREEN_MID_X/1;
-		var maxDistY = SCREEN_MID_Y/1;
-		var maxDist = maxDistX;
-		if(maxDistY < maxDistX){
-			maxDist = maxDistY;
-		}
-		if(dist > maxDist){
-			dist = maxDist;
-		}
-		var distPercent = dist/maxDist;
-		var maxSpeed = 80;
-		var minSpeed = 0;
-		*/
+		//}
+	
 
 		if(!players.length){
 			console.log("players not initialized yet");
