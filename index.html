@@ -38,6 +38,13 @@
 	<script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-7HEP5RL9MR');</script>
 
 <!--
+3.10.
+- helicopter can now rotate with right click.
+- helicopter no longer automatically flips x axis from image when moving.
+- added helicopter as 3d sprite.
+- fixed complane normalmap (was rendered wrong in blender).
+- use shift+rotation key (A/D) to rotate 10 times slower.
+
 1.10.
 - added 90 degree rotations for plane.
 - added commercial airplane model as default testing plane.
@@ -898,12 +905,14 @@ var night_fade_dir = 0; // 0 = night disabled.
 
 
 var plane_flipping = 0;
+
 var planeFrameIndex = 0;
 var plane_current_flip_dir = 0; // 1 = spin_to_up, 0 = spin_to_down
 
 var heliFrameIndex = 0;
-var heli_current_flip_dir = 0; // 1 = spin_to_up, 0 = spin_to_down
+var heli_current_flip_dir = 0;
 
+var ufoFrameIndex = 0;
 
 
 
@@ -1113,6 +1122,15 @@ var TEXTURES = {
 	'helicopter_lights_sprite_url': {path: "sprites/---helicopter_2x-lights.png", 
 								config: default_texture_config},
 								
+	'ufo_texture': 	        	{path: "sprites/ufo/texture.png", 
+								config: default_texture_config},
+								
+	'ufo_normalmap':            {path: "sprites/ufo/normalmap.png", 
+								config: default_texture_config},
+								
+	'ufo_lights': 			    {path: "sprites/---lights.png", 
+								config: default_texture_config},
+								
 	'bomber_sprite_url': 		{path: 'sprites/bomber_c47_2x.png', 
 								config: default_texture_config},
 								
@@ -1269,6 +1287,12 @@ var SPRITES = {
 			'to_180':   ranged(15, 31),
 			'from_180': ranged(31, 15),
 			'from_90':  ranged(15, 1),
+		},
+	},
+	'ufo_spin': {
+		'maxframes': 84,
+		'anims': {
+			'spin': ranged(1, 84),
 		},
 	},
 };
@@ -1548,6 +1572,9 @@ var planeNormalTex = null;
 var helicopterTex = null;
 var helicopterEmissiveTex = null;
 var helicopterNormalTex = null;
+var ufoTex = null;
+var ufoEmissiveTex = null;
+var ufoNormalTex = null;
 var santaSpriteTest = null;
 var santaEmissiveTex = null;
 var bomberEmissiveTex = null;
@@ -1739,6 +1766,9 @@ var loaded = {
 	helicopter: false,
 	helicopter_lights: false,
 	helicopter_normalmap: false,
+	ufo: false,
+	ufo_lights: false,
+	ufo_normalmap: false,
 };
 
 
@@ -4124,12 +4154,12 @@ function pre_init(){
 		let mesh = new THREE.Mesh(geometry, material);
 		let mscale = 1;
 
-		mesh.position.x = 200;
-		mesh.position.z = -4050;
+		mesh.position.x = 385;
+		mesh.position.z = -3710;
 		mesh.position.y = Z_PLANE;
 
 		mesh.rotation.x = -Math.PI/2;
-		mesh.scale.set(mscale,mscale,mscale);
+		mesh.scale.set(mscale,-mscale,mscale);
 		
 		var i = add_player(mesh, TYPE_SANTA);
 		santaPlayer = i;
@@ -4138,6 +4168,112 @@ function pre_init(){
 	
 	
 
+
+
+
+	ufoTex = new THREE.TextureLoader().load(texture_path('ufo_texture'), function(tex){
+		tex.image = correct_texture_size(tex.image);
+		loaded.ufo = true;
+		set_loading_desc("Ufo loaded");
+		
+		
+
+		let scale = 2;
+		let mesh_w = (466+2)/scale;
+		let mesh_h = (186+2)/scale;
+		let frames_x = 4;
+		let tex_frame_w = mesh_w*scale;
+		let tex_frame_h = mesh_h*scale;
+		
+/*
+ufo player:
+24 , 6
+489 , 191
+ 
+
+466 x 186
+*/
+
+		let sprite_name = 'ufo_spin';
+		initialize_sprite(sprite_name, tex_frame_w, tex_frame_h, tex.image.width, tex.image.height, frames_x);
+
+
+		tex.minFilter = globalFilter;
+		tex.magFilter = globalFilter;
+		tex.repeat.x = tex_frame_w/tex.image.width;
+		tex.repeat.y = tex_frame_h/tex.image.height;
+		tex.offset.x = 0;
+		tex.offset.y = 0;
+		tex.flipY = false;
+		
+		ufoEmissiveTex = new THREE.TextureLoader().load(texture_path('ufo_lights'), function(tex){
+			tex.image = correct_texture_size(tex.image);
+			loaded.ufo_lights = true;
+			set_loading_desc("Ufo lights loaded");
+
+			tex.minFilter = globalFilter;
+			tex.magFilter = globalFilter;
+			tex.repeat.x = tex_frame_w/tex.image.width;
+			tex.repeat.y = tex_frame_h/tex.image.height;
+			tex.offset.x = 0;
+			tex.offset.y = 0;
+			tex.flipY = false;
+		}, null, function(err){
+			loaded.ufo_lights = true;
+			show_texture_loading_warning(err);
+		});
+		
+		ufoNormalTex = new THREE.TextureLoader().load(texture_path('ufo_normalmap'), function(tex){
+			tex.image = correct_texture_size(tex.image);
+			loaded.ufo_normalmap = true;
+			set_loading_desc("Ufo normalmap loaded");
+
+			tex.minFilter = globalFilter;
+			tex.magFilter = globalFilter;
+			tex.repeat.x = tex_frame_w/tex.image.width;
+			tex.repeat.y = tex_frame_h/tex.image.height;
+			tex.offset.x = 0;
+			tex.offset.y = 0;
+			tex.flipY = false;
+		}, null, function(err){
+			loaded.ufo_normalmap = true;
+			show_texture_loading_warning(err);
+		});
+		
+
+		let geometry = new THREE.PlaneGeometry(mesh_w, mesh_h);
+		let material = new THREE.MeshPhongMaterial({map: ufoTex, color: 0xFFFFFF});  			
+		material.color.set(0xFFFFFF);
+		material.transparent = true;
+		material.alphaTest = 0.5;
+		material.side = THREE.DoubleSide;
+		
+		material.emissive.set(0xFFFFFF);
+		material.emissiveMap = ufoEmissiveTex;
+		material.emissiveIntensity = 0.6;
+		
+		material.normalMap = ufoNormalTex;
+		material.normalScale = new THREE.Vector2(1, 1);
+		material.reflectivity = 0.8; // shininess / metalness
+		material.specular = new THREE.Color(0x050505);
+		material.envMap = reflectionCube;
+		//material.envMap = textureCube;
+
+		let mesh = new THREE.Mesh(geometry, material);
+		let mscale = 1;
+		mesh.position.x = 316;
+		mesh.position.y = Z_PLANE;
+		mesh.position.z = -3850;
+		
+		mesh.rotation.x = -Math.PI/2;
+		mesh.scale.set(mscale,-mscale,mscale);
+		
+		var i = add_player(mesh, TYPE_HELI);
+		change_player(i);
+		scene.add(players[i].mesh);
+	});
+	
+	
 
 
 	helicopterTex = new THREE.TextureLoader().load(texture_path('helicopter_texture'), function(tex){
@@ -4366,7 +4502,6 @@ function pre_init(){
 		mesh.scale.set(-mscale,mscale,mscale);
 	
 		var i = add_player(mesh, TYPE_PLANE);
-		change_player(i);
 		scene.add(players[i].mesh);
 
 	});
@@ -6198,6 +6333,28 @@ function render(renderFrame){
 
 
 
+	{
+
+		let speedAdd = 1;
+		ufoFrameIndex += speedAdd;
+		
+		let sprite_name = 'ufo_spin';
+		let animation_name = 'spin';
+		let anim_frames = SPRITES[sprite_name]['anims'][animation_name].length;
+
+		if(ufoFrameIndex >= anim_frames){
+			ufoFrameIndex = ufoFrameIndex - Math.floor(ufoFrameIndex/anim_frames)*anim_frames;
+		}
+
+		let pos = frame_offset(sprite_name, animation_name, Math.floor(ufoFrameIndex));
+
+		ufoTex.offset.x = pos.x;
+		ufoTex.offset.y = pos.y;
+		
+		ufoEmissiveTex.offset.x = pos.x;
+		ufoEmissiveTex.offset.y = pos.y;
+	}
+
 
 	{
 
@@ -6404,6 +6561,7 @@ function render(renderFrame){
 		}
 
 
+		
 	
 
 		if(plane_flipping){
