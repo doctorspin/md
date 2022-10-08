@@ -38,8 +38,14 @@
 	<script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-7HEP5RL9MR');</script>
 
 <!--
+8.10.
+- turret trajectories visible with L button.
+- shotgun bullets optimized a bit.
+- added whole planet full of turrets and bomb turrets as well.
+- bullets have fusetimer, so they will explode after some time.
+
 7.10.
-- added smoother round explosion with more frames.
+- added smoother round explosion with more frames and transparency.
 
 3.10.
 - added ufo player, uses same controls as helicopter.
@@ -902,6 +908,7 @@ var SHOW_NIGHTSKY_BG = false;
 var NIGHTSKY_STYLE = 0; // 0 = night, 1 = sunset (bright yellow).
 var turrets_enabled = true;
 var turret_trajectories_enabled = 0;
+var player_trajectories_enabled = 1;
 
 
 var fade_dir = 0;
@@ -1696,10 +1703,6 @@ let BUOYANCY_CONSTANT = 0.01; // force to player making him rise up from water.
 let AIR_RESISTANCE = 1;//0.995; // kx multiplied by this on air.
 let WATER_RESISTANCE = 0.97; // kx multiplied by this in water.
 
-let TURRET_ANTIAIR_RANGE = 1200; // how far turrets can shoot by default.
-let TURRET_BOMBER_RANGE = 1500;
-
-let PROJECTILE_MAX_FRAMES = 60*10; // 10 secs frames total.
 
 let MAX_TEX_SIZE = 1024; // will be initialized at pre_init
 
@@ -1975,13 +1978,20 @@ var visuals = []; // glow sprites etc... works same way as explosions basically.
 
 let FPS = 60;
 
+let PROJECTILE_MAX_FRAMES = 120*FPS;
+
 // how long (player) projectiles will be alive in frames:
-let SHOT_FUSETIME =  10*FPS; // 60 seconds
-let BOMB_FUSETIME = 30*FPS; // 120 seconds
+let SHOT_FUSETIME = 20*FPS;
+let BOMB_FUSETIME = 120*FPS;
 
 // turrets fusetimes:
 let TURRET_ANTIAIR_FUSETIME = 4*FPS;
-let TURRET_BOMBER_FUSETIME = 2*FPS;
+let TURRET_BOMBER_FUSETIME = 3*FPS;
+
+let TURRET_ANTIAIR_RANGE = 1200; // how far turrets can shoot by default.
+let TURRET_BOMBER_RANGE = 1500;
+
+
 
 
 var prevFpsTime = 0;
@@ -2249,6 +2259,11 @@ function add_player(mesh, type){
 		WEAPON_PLANEGUN,
 	];
 	
+	let trajectory_mesh = create_trajectory_mesh(0x00FF00);
+	trajectory_mesh.visible = false; // hide before using it.
+	trajectory_mesh.frustumCulled = false;
+	scene.add(trajectory_mesh);
+	
 	players.push({
 		'nick': randomNick(),
 		'color': "#FFFFFF",
@@ -2271,6 +2286,7 @@ function add_player(mesh, type){
 		'z': mesh.position.z,
 		
 		'y_offset': randomized_y(0),
+		'trajectory_mesh': trajectory_mesh,
 		
 		'lane': 0, // -1, 0, 1 possible.
 		'ammo': 1000000,
@@ -6544,14 +6560,67 @@ function render(renderFrame){
 			player.mesh.position.x = player.x;
 			player.mesh.position.y = virtual_y;
 			player.mesh.position.z = player.z;
+			
+			player.trajectory_mesh.visible = false;
 		}
 	} // players
 	
+	
+	
+	
+	if(player_trajectories_enabled){
+		// the real trajectory where all gravitys affects:
+		
+		let player = players[myPlayer];
+		
+		let dire_bullet = new get_kxy_angle(player.shoot_angle);
+		
+		let bullet_speed = 20;
+	
+		let shot = {
+			'x': player.x,
+			'z': player.z,
+			'kx': dire_bullet.x*bullet_speed,
+			'kz': dire_bullet.z*bullet_speed,
+		};
+		
+		let curweapon = player.weapons1[player.current1];
+		let maxframes = SHOT_FUSETIME;
+		if(curweapon == WEAPON_PLANEGUN){
+			maxframes = SHOT_FUSETIME;
+		}else if(curweapon == WEAPON_BOMB){
+			maxframes = BOMB_FUSETIME;
+		}
+		console.log(maxframes);
+
+		
+		let trajectory_points = [];
+		
+		for(let i = 0; i < maxframes; i++){
+			trajectory_points.push({
+				'x': shot.x, 
+				'y': Z_RAIN, 
+				'z': shot.z,
+			});
+			
+			shot.x += shot.kx;
+			shot.z += shot.kz;
+			
+			apply_gravity(shot);
+			
+			if(is_ground(shot.x, shot.z)){
+				break;
+			}
+		}
+
+		update_trajectory(player.trajectory_mesh, trajectory_points);
+	}
+
+
 
 
 
 	{
-
 		let speedAdd = 1;
 		ufoFrameIndex += speedAdd;
 		
@@ -8003,9 +8072,10 @@ function shoot_turret(turret, owner, shot_allowed, dist){
 
 
 	let shot_start_x = turret.x;
+	//let shot_start_z = turret.z-17;
 	let shot_start_z = turret.z-17;
 	
-	let bullet_speed = 20.1; // speed 1 = 1*0.1+20 (lol)
+	let bullet_speed = 20; // speed 1 = 1*0.1+20 (lol)
 	let max_frames_per_dist = 30*(turret.range*2)/bullet_speed; // double in case needed
 
 	// add prediction of player movement in the future:
@@ -8176,6 +8246,12 @@ function shoot_turret(turret, owner, shot_allowed, dist){
 				}
 				
 				for(let i = 0; i < maxframes; i++){
+					trajectory_points.push({
+						'x': shot.x, 
+						'y': Z_RAIN, 
+						'z': shot.z,
+					});
+					
 					shot.x += shot.kx;
 					shot.z += shot.kz;
 					
@@ -8183,11 +8259,7 @@ function shoot_turret(turret, owner, shot_allowed, dist){
 					//shot.kx *= AIR_RESISTANCE;
 					shot.kz += GRAVITY.value;
 					
-					trajectory_points.push({
-						'x': shot.x, 
-						'y': Z_RAIN, 
-						'z': shot.z,
-					});
+					
 				}
 				
 				update_trajectory(turret.trajectory_mesh, trajectory_points);
@@ -8236,16 +8308,18 @@ function shoot_turret(turret, owner, shot_allowed, dist){
 				}
 				
 				for(let i = 0; i < maxframes; i++){
-					shot.x += shot.kx;
-					shot.z += shot.kz;
-					
-					apply_gravity(shot);
-					
 					trajectory_real_points.push({
 						'x': shot.x, 
 						'y': Z_RAIN, 
 						'z': shot.z,
 					});
+					
+					shot.x += shot.kx;
+					shot.z += shot.kz;
+					
+					apply_gravity(shot);
+					
+				
 				}
 				
 				update_trajectory(turret.trajectory_real_mesh, trajectory_real_points);
