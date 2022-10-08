@@ -2264,10 +2264,25 @@ function add_player(mesh, type){
 		WEAPON_PLANEGUN,
 	];
 	
-	let trajectory_mesh = create_trajectory_mesh(0x00FF00);
+
+	// "left"
+	let trajectory_mesh2 = create_trajectory_mesh(0xFF00FF);
+	trajectory_mesh2.visible = false; // hide before using it.
+	trajectory_mesh2.frustumCulled = false;
+	scene.add(trajectory_mesh2);
+	
+	// middle
+	let trajectory_mesh = create_trajectory_mesh(0xFFFFFF);
 	trajectory_mesh.visible = false; // hide before using it.
 	trajectory_mesh.frustumCulled = false;
 	scene.add(trajectory_mesh);
+	
+	// "right"
+	let trajectory_mesh3 = create_trajectory_mesh(0xFF00FF);
+	trajectory_mesh3.visible = false; // hide before using it.
+	trajectory_mesh3.frustumCulled = false;
+	scene.add(trajectory_mesh3);
+	
 	
 	players.push({
 		'nick': randomNick(),
@@ -2292,6 +2307,8 @@ function add_player(mesh, type){
 		
 		'y_offset': randomized_y(0),
 		'trajectory_mesh': trajectory_mesh,
+		'trajectory_mesh2': trajectory_mesh2,
+		'trajectory_mesh3': trajectory_mesh3,
 		
 		'lane': 0, // -1, 0, 1 possible.
 		'ammo': 1000000,
@@ -6585,6 +6602,8 @@ function render(renderFrame){
 			player.mesh.position.z = player.z;
 			
 			player.trajectory_mesh.visible = false;
+			player.trajectory_mesh2.visible = false;
+			player.trajectory_mesh3.visible = false;
 		}
 	} // players
 	
@@ -6616,6 +6635,8 @@ function render(renderFrame){
 		}
 
 		let trajectory_points = [];
+		let trajectory_points2 = [];
+		let trajectory_points3 = [];
 		
 
 		for(let i = 0; i < maxframes; i++){
@@ -6641,8 +6662,35 @@ function render(renderFrame){
 				break;
 			}
 		}
+		
+		for(let i = 0; i < trajectory_points.length; i++){
+			let cur_point = trajectory_points[i];
+			let next_index = i+1;
+			if(next_index > trajectory_points.length-1){
+				next_index = trajectory_points.length-1;
+			}
+			let next_point = trajectory_points[next_index];
+			let angle = get_angle(cur_point.x, cur_point.z, next_point.x, next_point.z);
+			let left_dire = new get_kxy_angle(angle-90);
+			let right_dire = new get_kxy_angle(angle+90);
+			let radius = (1/camera.zoom)*0.8; // *0.8 is best, doesnt leave holes in middle of line.
+			trajectory_points2.push({
+				'x': cur_point.x+left_dire.x*radius,
+				'y': cur_point.y,
+				'z': cur_point.z+left_dire.z*radius,
+			});
+			trajectory_points3.push({
+				'x': cur_point.x+right_dire.x*radius,
+				'y': cur_point.y,
+				'z': cur_point.z+right_dire.z*radius,
+			});
+		}
+		
+		console.log(camera.zoom);
 
 		update_trajectory(player.trajectory_mesh, trajectory_points);
+		update_trajectory(player.trajectory_mesh2, trajectory_points2);
+		update_trajectory(player.trajectory_mesh3, trajectory_points3);
 	}
 
 
