@@ -1224,6 +1224,9 @@ var TEXTURES = {
 	'explosion_round': 			{path: 'sprites/explosion_round.png', 
 								config: default_texture_config},
 								
+	'explosion_round_laser': 	{path: 'sprites/explosion_round_laser.png', 
+								config: default_texture_config},
+								
 	'explosion_round_small':	{path: 'sprites/explosion_round_small.png', 
 								config: default_texture_config},
 								
@@ -1633,6 +1636,7 @@ var bomberEmissiveTex = null;
 var soldierSpriteTest = null;
 var explosionSpriteTest = null;
 var explosionRoundTex = null;
+var explosionRoundLaserTex = null;
 var explosionRoundSmallTex = null;
 var splashSpriteTest = null;
 var glowspriteTex = null;
@@ -1746,11 +1750,22 @@ var TYPE_HELI = 4; // helicopter. flipped in x axis.
 var WEAPON_PLANEGUN = 0;
 var WEAPON_SHOTGUN = 1;
 var WEAPON_BOMB = 2;
+var WEAPON_BOMB_LASER = 3;
+
+// index = current weapon index.
+var WEAPON_COLORS = [
+	{edge: 0xFF8800, middle: 0xFFFF00}, // planegun
+	{edge: 0x006600, middle: 0xFFFFFF}, // shotgun
+	{edge: 0xFF0000, middle: 0xFFFF00}, // bomb
+	{edge: 0xFF00FF, middle: 0xFFFFFF}, // bomb_laser
+];
+
 
 // explosion types:
 var EXPLOSION_ROUND = 0; // generic explosion anywhere since its circular shape.
 var EXPLOSION_FLAT = 1; // explosion for buildings etc that are on flat surface.
 var EXPLOSION_ROUND_SMALL = 2;
+var EXPLOSION_ROUND_LASER = 3;
 
 // explosion sizes:
 var EXPLOSION_TINY = 0;
@@ -1814,6 +1829,7 @@ var loaded = {
 	waterdrops: false,
 	explosions: false,
 	explosion_round: false,
+	explosion_round_laser: false,
 	explosion_round_small: false,
 	bombs: false,
 	splashes: false,
@@ -1988,6 +2004,7 @@ let PROJECTILE_MAX_FRAMES = 120*FPS;
 // how long (player) projectiles will be alive in frames:
 let SHOT_FUSETIME = 20*FPS;
 let BOMB_FUSETIME = 8*120*FPS;
+let BOMB_LASER_FUSETIME = 8*120*FPS;
 
 // turrets fusetimes:
 let TURRET_ANTIAIR_FUSETIME = 4*FPS;
@@ -2258,27 +2275,31 @@ function add_player(mesh, type){
 		WEAPON_PLANEGUN,
 		WEAPON_SHOTGUN,
 		WEAPON_BOMB,
+		WEAPON_BOMB_LASER,
 	];
 	var weapons2 = [
 		WEAPON_BOMB,
 		WEAPON_PLANEGUN,
 	];
+	let current1 = 3;
+	let current2 = 0;
 	
+	let weapon_color = WEAPON_COLORS[current1];
 
 	// "left"
-	let trajectory_mesh2 = create_trajectory_mesh(0xFF00FF);
+	let trajectory_mesh2 = create_trajectory_mesh(weapon_color.edge);
 	trajectory_mesh2.visible = false; // hide before using it.
 	trajectory_mesh2.frustumCulled = false;
 	scene.add(trajectory_mesh2);
 	
 	// middle
-	let trajectory_mesh = create_trajectory_mesh(0xFFFFFF);
+	let trajectory_mesh = create_trajectory_mesh(weapon_color.middle);
 	trajectory_mesh.visible = false; // hide before using it.
 	trajectory_mesh.frustumCulled = false;
 	scene.add(trajectory_mesh);
 	
 	// "right"
-	let trajectory_mesh3 = create_trajectory_mesh(0xFF00FF);
+	let trajectory_mesh3 = create_trajectory_mesh(weapon_color.edge);
 	trajectory_mesh3.visible = false; // hide before using it.
 	trajectory_mesh3.frustumCulled = false;
 	scene.add(trajectory_mesh3);
@@ -2322,10 +2343,10 @@ function add_player(mesh, type){
 		'owner': owner,
 		// primary weapons:
 		'weapons1': weapons1, // list of weapons used by click (machinegun etc).
-		'current1': 0, // current selected weapon from that list.
+		'current1': current1, // current selected weapon from that list.
 		// secondary weapons:
 		'weapons2': weapons2, // list of weapons used by space (bombs etc).
-		'current2': 0,
+		'current2': current2,
 	});
 	
 	console.log("mesh.position.y: "+mesh.position.y);
@@ -4222,6 +4243,23 @@ function pre_init(){
 		tex.flipY = false;
 	});
 	
+	explosionRoundLaserTex = new THREE.TextureLoader().load(texture_path('explosion_round_laser'), function(tex){
+		tex.image = correct_texture_size(tex.image);
+		loaded.explosion_round_laser = true;
+		set_loading_desc("Explosion round laser loaded");
+		
+		let w = 240;
+		let h = 240;
+
+		tex.minFilter = globalFilter;
+		tex.magFilter = globalFilter;
+		tex.repeat.x = w/tex.image.width;
+		tex.repeat.y = h/tex.image.height;
+		tex.offset.x = 0;
+		tex.offset.y = 0;
+		tex.flipY = false;
+	});
+	
 	explosionRoundSmallTex = new THREE.TextureLoader().load(texture_path('explosion_round_small'), function(tex){
 		tex.image = correct_texture_size(tex.image);
 		loaded.explosion_round_small = true;
@@ -5558,8 +5596,92 @@ function apply_edge_rules(obj){
 }
 
 
+function get_trajectory_points(){
+
+	let player = players[myPlayer];
+
+	let dire_bullet = new get_kxy_angle(player.shoot_angle);
+	
+	let bullet_speed = 20;
+
+	let shot = {
+		'x': player.x,
+		'z': player.z,
+		'kx': dire_bullet.x*bullet_speed,
+		'kz': dire_bullet.z*bullet_speed,
+	};
+	
+	let curweapon = player.weapons1[player.current1];
+	let maxframes = SHOT_FUSETIME;
+	if(curweapon == WEAPON_PLANEGUN){
+		maxframes = SHOT_FUSETIME;
+	}else if(curweapon == WEAPON_BOMB){
+		maxframes = BOMB_FUSETIME;
+	}else if(curweapon == WEAPON_BOMB_LASER){
+		maxframes = BOMB_LASER_FUSETIME;
+	}
+
+	let trajectory_points = [];
+
+	for(let i = 0; i < maxframes; i++){
+		if((i % 8) == 0){
+			trajectory_points.push({
+				'x': shot.x, 
+				'y': Z_RAIN, 
+				'z': shot.z,
+			});
+		}
+		
+		shot.x += shot.kx;
+		shot.z += shot.kz;
+		
+		apply_gravity(shot);
+		
+		if(is_ground(shot.x, shot.z)){
+			trajectory_points.push({
+				'x': shot.x, 
+				'y': Z_RAIN, 
+				'z': shot.z,
+			});
+			break;
+		}
+	}
+	
+	return trajectory_points;
+}
 
 
+
+function create_edge_points(trajectory_points){
+	let trajectory_points2 = [];
+	let trajectory_points3 = [];
+	for(let i = 0; i < trajectory_points.length; i++){
+		let cur_point = trajectory_points[i];
+		let next_index = i+1;
+		if(next_index > trajectory_points.length-1){
+			next_index = trajectory_points.length-1;
+		}
+		let next_point = trajectory_points[next_index];
+		let angle = get_angle(cur_point.x, cur_point.z, next_point.x, next_point.z);
+		let left_dire = new get_kxy_angle(angle-90);
+		let right_dire = new get_kxy_angle(angle+90);
+		let radius = (1/camera.zoom)*0.8; // *0.8 is best, doesnt leave holes in middle of line.
+		trajectory_points2.push({
+			'x': cur_point.x+left_dire.x*radius,
+			'y': cur_point.y,
+			'z': cur_point.z+left_dire.z*radius,
+		});
+		trajectory_points3.push({
+			'x': cur_point.x+right_dire.x*radius,
+			'y': cur_point.y,
+			'z': cur_point.z+right_dire.z*radius,
+		});
+	}
+	return {
+		'left': trajectory_points2,
+		'right': trajectory_points3,
+	};
+}
 
 
 function render(renderFrame){
@@ -5863,6 +5985,19 @@ function render(renderFrame){
 				}
 			}
 			
+			let explosion_type_round = EXPLOSION_ROUND;
+			let explosion_type_flat = EXPLOSION_FLAT;
+			let explosion_size = EXPLOSION_LARGE;
+			let explosion_color = 0x555555;
+			
+			if(bomb.type == WEAPON_BOMB_LASER){
+				explosion_type_round = EXPLOSION_ROUND_LASER;
+				explosion_type_flat = EXPLOSION_ROUND_LASER;
+				explosion_size = EXPLOSION_HUGE2;
+				explosion_color = 0xAA22AA;
+			}
+			
+			
 			let bomberHit = -1;
 			if(bomb.owner >= 0){ // only players can hit AI bombers. 
 				bomberHit = hits_bomber(bomb.owner, bomb.x, bomb.z);
@@ -5873,7 +6008,7 @@ function render(renderFrame){
 			if(bomberHit != -1){
 				
 				play_sound("explosion_bomb", bomb.x, bomb.z);
-				explode_at(bomb.mesh.position.x, bomb.mesh.position.z, EXPLOSION_ROUND, EXPLOSION_LARGE);
+				explode_at(bomb.mesh.position.x, bomb.mesh.position.z, explosion_type_round, explosion_size, true, explosion_color);
 				
 				hit_bomber(bomberHit, 200);
 				
@@ -5881,7 +6016,7 @@ function render(renderFrame){
 				scene.remove(bombs[i].mesh);
 			}else if(playerHit != -1){
 				play_sound("explosion_bomb", bomb.x, bomb.z);
-				explode_at(bomb.mesh.position.x, bomb.mesh.position.z, EXPLOSION_ROUND, EXPLOSION_LARGE);
+				explode_at(bomb.mesh.position.x, bomb.mesh.position.z, explosion_type_round, explosion_size, true, explosion_color);
 
 				hit_player(playerHit, 200);
 				
@@ -5889,7 +6024,7 @@ function render(renderFrame){
 				scene.remove(bombs[i].mesh);
 			}else if(turretHit != -1){
 				play_sound("explosion_bomb", bomb.x, bomb.z);
-				explode_at(bomb.mesh.position.x, bomb.mesh.position.z, EXPLOSION_ROUND, EXPLOSION_LARGE);
+				explode_at(bomb.mesh.position.x, bomb.mesh.position.z, explosion_type_round, explosion_size, true, explosion_color);
 
 				hit_turret(turretHit, 200);
 				
@@ -5906,7 +6041,7 @@ function render(renderFrame){
 					
 					if(ground_found){
 						play_sound("explosion_bomb", bomb.x, bomb.z);
-						explode_at(bomb.mesh.position.x, bomb.mesh.position.z, EXPLOSION_FLAT, EXPLOSION_LARGE);
+						explode_at(bomb.mesh.position.x, bomb.mesh.position.z, explosion_type_flat, explosion_size, true, explosion_color);
 					}else if(underwater){
 						play_sound("bomb_splash", bomb.x, bomb.z);
 						splash_at(bomb.mesh.position.x, bomb.mesh.position.z, SPLASH_MEDIUM);
@@ -5927,7 +6062,7 @@ function render(renderFrame){
 				scene.remove(bombs[i].mesh);
 				
 				play_sound("explosion_bomb", bomb.x, bomb.z);
-				explode_at(bomb.mesh.position.x, bomb.mesh.position.z, EXPLOSION_ROUND, EXPLOSION_LARGE);
+				explode_at(bomb.mesh.position.x, bomb.mesh.position.z, explosion_type_round, explosion_size, true, explosion_color);
 			}
 		}
 	} // bombs
@@ -6236,6 +6371,16 @@ function render(renderFrame){
 				tex_w = 512;
 				tex_h = 512;
 				frame_step = 1;
+			}else if(explosion.type == EXPLOSION_ROUND_LASER){
+				startX = 0; // top-left corner where in the sheet the animation sequence is.
+				startY = 0;
+				maxFrames = 45;//20;
+				framesX = 8;
+				frame_w = 240;
+				frame_h = 240;
+				tex_w = 2048;
+				tex_h = 2048;
+				frame_step = 1;
 			}else if(explosion.type == EXPLOSION_FLAT){
 				startX = 0; // top-left corner where in the sheet the animation sequence is.
 				startY = 3;
@@ -6333,6 +6478,10 @@ function render(renderFrame){
 				startX = 0;
 				startY = 0;
 				maxFrames = 20;
+			}else if(visual.type == EXPLOSION_ROUND_LASER){
+				startX = 0;
+				startY = 0;
+				maxFrames = 30;
 			}else if(visual.type == EXPLOSION_FLAT){
 				startX = 0;
 				startY = 3;
@@ -6614,83 +6763,13 @@ function render(renderFrame){
 		// the real trajectory where all gravitys affects:
 		
 		let player = players[myPlayer];
-
-		let dire_bullet = new get_kxy_angle(player.shoot_angle);
+		let trajectory_points = get_trajectory_points();
 		
-		let bullet_speed = 20;
-	
-		let shot = {
-			'x': player.x,
-			'z': player.z,
-			'kx': dire_bullet.x*bullet_speed,
-			'kz': dire_bullet.z*bullet_speed,
-		};
-		
-		let curweapon = player.weapons1[player.current1];
-		let maxframes = SHOT_FUSETIME;
-		if(curweapon == WEAPON_PLANEGUN){
-			maxframes = SHOT_FUSETIME;
-		}else if(curweapon == WEAPON_BOMB){
-			maxframes = BOMB_FUSETIME;
-		}
-
-		let trajectory_points = [];
-		let trajectory_points2 = [];
-		let trajectory_points3 = [];
-		
-
-		for(let i = 0; i < maxframes; i++){
-			if((i % 8) == 0){
-				trajectory_points.push({
-					'x': shot.x, 
-					'y': Z_RAIN, 
-					'z': shot.z,
-				});
-			}
-			
-			shot.x += shot.kx;
-			shot.z += shot.kz;
-			
-			apply_gravity(shot);
-			
-			if(is_ground(shot.x, shot.z)){
-				trajectory_points.push({
-					'x': shot.x, 
-					'y': Z_RAIN, 
-					'z': shot.z,
-				});
-				break;
-			}
-		}
-		
-		for(let i = 0; i < trajectory_points.length; i++){
-			let cur_point = trajectory_points[i];
-			let next_index = i+1;
-			if(next_index > trajectory_points.length-1){
-				next_index = trajectory_points.length-1;
-			}
-			let next_point = trajectory_points[next_index];
-			let angle = get_angle(cur_point.x, cur_point.z, next_point.x, next_point.z);
-			let left_dire = new get_kxy_angle(angle-90);
-			let right_dire = new get_kxy_angle(angle+90);
-			let radius = (1/camera.zoom)*0.8; // *0.8 is best, doesnt leave holes in middle of line.
-			trajectory_points2.push({
-				'x': cur_point.x+left_dire.x*radius,
-				'y': cur_point.y,
-				'z': cur_point.z+left_dire.z*radius,
-			});
-			trajectory_points3.push({
-				'x': cur_point.x+right_dire.x*radius,
-				'y': cur_point.y,
-				'z': cur_point.z+right_dire.z*radius,
-			});
-		}
-		
-		console.log(camera.zoom);
+		let edge_points = create_edge_points(trajectory_points);
 
 		update_trajectory(player.trajectory_mesh, trajectory_points);
-		update_trajectory(player.trajectory_mesh2, trajectory_points2);
-		update_trajectory(player.trajectory_mesh3, trajectory_points3);
+		update_trajectory(player.trajectory_mesh2, edge_points.left);
+		update_trajectory(player.trajectory_mesh3, edge_points.right);
 	}
 
 
@@ -7261,24 +7340,33 @@ function find_free_bomber(){
 
 
 
-function explode_at(x, z, type, size, glowing){
+function explode_at(x, z, type, size, glowing, glowcolor){
 
 	if(typeof glowing === "undefined"){
 		glowing = true;
 	}
-
+	
 	// spawn glowing...
 	if(glowing){
-		glow_at(x, z, type, size);
+		glow_at(x, z, type, size, glowcolor);
 		//light_at(x, z, type, size);
 		
 		//light_at(x, z, type, 500, 4);
 	}
-
-	let random_rotation = false;
-	if(type == EXPLOSION_ROUND){
+	
+	let frame;
+	let random_rotation;
+	
+	if(type == EXPLOSION_ROUND ||
+		type == EXPLOSION_ROUND_SMALL ||
+		type == EXPLOSION_ROUND_LASER)
+	{
 		// only round explosions can be rotated around their center point.
 		random_rotation = true;
+		frame = 5; // skip first frames.
+	}else{
+		random_rotation = false;
+		frame = 0;
 	}
 
 	let mscale = 1; // default EXPLOSION_MEDIUM.
@@ -7314,6 +7402,8 @@ function explode_at(x, z, type, size, glowing){
 			texture = explosionRoundTex.clone();
 		}else if(type == EXPLOSION_ROUND_SMALL){
 			texture = explosionRoundSmallTex.clone();
+		}else if(type == EXPLOSION_ROUND_LASER){
+			texture = explosionRoundLaserTex.clone();
 		}else{
 			texture = explosionSpriteTest.clone();
 		}
@@ -7359,12 +7449,7 @@ function explode_at(x, z, type, size, glowing){
 	
 	mesh.scale.set(mscale,mscale,mscale);
 
-	let frame;
-	if(type == EXPLOSION_ROUND){
-		frame = 5; // skip first frames.
-	}else{
-		frame = 0;
-	}
+
 	
 	
 	
@@ -7429,7 +7514,8 @@ function light_at(x, z, type, size, brightness){
 
 
 
-function glow_at(x, z, type, size){
+// flash_at
+function glow_at(x, z, type, size, color){
 
 	let mscale = 1; // default EXPLOSION_MEDIUM.
 	
@@ -7453,6 +7539,10 @@ function glow_at(x, z, type, size){
 	mscale *= 3; // double the size relative to explosion size.
 
 
+	if(typeof color === "undefined"){
+		color = 0x555555;
+	}
+
 	let w = 128;
 	let h = 128;
 
@@ -7466,8 +7556,8 @@ function glow_at(x, z, type, size){
 		texture.needsUpdate = true;
 
 		let geometry = new THREE.PlaneGeometry(w, h);
-		let material = new THREE.MeshBasicMaterial({map: texture, color: 0x444444});
-		material.color.set(0x555555);
+		let material = new THREE.MeshBasicMaterial({map: texture});
+		material.color.set(color);
 		material.transparent = true;
 		//material.opacity = 1; // fades out after it is created.
 		material.side = THREE.DoubleSide;
@@ -7477,6 +7567,7 @@ function glow_at(x, z, type, size){
 	}else{
 		mesh = visuals[foundIndex].mesh;
 		mesh.visible = true;
+		mesh.material.color.set(color);
 	}
 	
 	mesh.rotation.x = Math.PI/2;
@@ -7946,16 +8037,22 @@ function spawn_turret(unit){
 
 
 
-function drop_bomb(owner, x, z, dire, speed, owned_by_ai, custom_fusetime){
+function drop_bomb(owner, x, z, dire, speed, owned_by_ai, custom_fusetime, type){
 
 	if(typeof owned_by_ai === "undefined"){
 		owned_by_ai = false;
 	}
 	
-	let fusetime = BOMB_FUSETIME;
+	let fusetime;
 	
 	if(typeof custom_fusetime !== "undefined"){
 		fusetime = custom_fusetime;
+	}else{
+		fusetime = BOMB_FUSETIME;
+	}
+		
+	if(typeof type === "undefined"){
+		type = WEAPON_BOMB;
 	}
 	
 	//play_sound("bomb_drop", x, z);
@@ -7997,6 +8094,7 @@ function drop_bomb(owner, x, z, dire, speed, owned_by_ai, custom_fusetime){
 		'time': getTimeMillis(),
 		'frame_created': frameNumber(),
 		'fusetime': fusetime, // time in ms when projectile dies.
+		'type': type,
 	};
 	bombs.push(bomb);
 	scene.add(bombs[bombs.length-1].mesh);
@@ -8470,8 +8568,21 @@ function shoot_from_myplayer(){
 		let speed = object_speed+20;
 		
 		drop_bomb(players[myPlayer].owner, x, z, dire, speed);
+	}else if(curplayer.weapons1[curplayer.current1] == WEAPON_BOMB_LASER){
+		let speed = 20;
+		
+		let trajectory_points = get_trajectory_points();
+		
+		let point = trajectory_points[trajectory_points.length-2]; // take second last point.
+		let next_point = trajectory_points[trajectory_points.length-1]; // take second last point.
+		let x = point.x;
+		let z = point.z;
+		let dire = new get_kxy(x, z, next_point.x, next_point.z);
+
+		drop_bomb(players[myPlayer].owner, x, z, dire, speed, false, BOMB_LASER_FUSETIME, WEAPON_BOMB_LASER);
 	}
 }
+
 
 
 
