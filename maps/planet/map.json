@@ -169,7 +169,7 @@
 		":comment": "default gravity settings, can be overridden by map pieces.",
 		"gravity": {
 			"style": "circular",
-			"force": 0.15,
+			"force": 0.2,
 		
 			":comment": "max force radius means that the gravity will fade out from that radius to both directions; inside and outside. meaning the center of the planet will have zero gravity like it should.",
 			"max_force_at_radius": 4000,
@@ -190,7 +190,7 @@
 		"sky": {
 			"space": {
 				":comment": "root_path is used to take images from the game shared assets.",
-				"root_path": "textures/stars/galaxy_stars.jpg",
+				"root_path": "textures/stars/galaxy_stars_squared.png",
 				":path": "textures/stars/stars.png",
 				"repeat": false,
 				"scale": 1,
@@ -231,6 +231,9 @@
 	":comment": "if x/y coordinate is missing, default is zero or link piece anchor x/y coordinate.",
 	":comment": "1970 was big planet radius, 997 for small planet.",
 	"units": [
+
+	],
+	"units_temp": [
 		{"owner":-1, "type":"antiair", "link":"planet1", "d":1970, "a":30},
 		{"owner":-1, "type":"antiair", "link":"planet1", "d":1970, "a":20},
 		{"owner":-1, "type":"antiair", "link":"planet1", "d":1970, "a":10},
