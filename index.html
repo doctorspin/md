@@ -4407,7 +4407,7 @@ ufo player:
 		mesh.scale.set(mscale,-mscale,mscale);
 		
 		var i = add_player(mesh, TYPE_HELI);
-		change_player(i);
+		
 		scene.add(mesh);
 	});
 	
@@ -4640,6 +4640,7 @@ ufo player:
 		mesh.scale.set(-mscale,mscale,mscale);
 	
 		var i = add_player(mesh, TYPE_PLANE);
+		change_player(i);
 		scene.add(mesh);
 
 	});
