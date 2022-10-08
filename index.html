@@ -1666,6 +1666,7 @@ var MOUSE_OFFSET_X = 0;
 var MOUSE_OFFSET_Y = 0;
 
 var MOUSE_ANGLE = 0;
+var MOUSE_ANGLE_DETAIL = 0;
 var MOUSE_DIST = 0;
 
 var SKYBOX_SCALE = 1.3;
@@ -2219,7 +2220,7 @@ function setAngle(i, angle){
 
 // setshootingangle
 function setShootAngle(i){
-	let angle = MOUSE_ANGLE + 180-rad2deg(camera.rotation.z);
+	let angle = (MOUSE_ANGLE+MOUSE_ANGLE_DETAIL) + 180-rad2deg(camera.rotation.z);
 	players[i].shoot_angle = angle;
 }
 
@@ -5366,6 +5367,7 @@ var frameTime_val = getTimeMillis();
 var frameNumber_val = 0;
 
 let ANGLE_MULTI = 1;
+let SPEED_MULTI = 1;
 
 var rotatePlayer = 0;
 
@@ -5569,7 +5571,22 @@ function render(renderFrame){
 		}
 	}
 	
+	
+
+	
 	let curplayer = players[myPlayer];
+	
+	if(key_down(16)){
+		if(key_down(90)){
+			MOUSE_ANGLE_DETAIL = (Math.random()-0.5)/10000;
+		}else if(key_down(226)){
+			MOUSE_ANGLE_DETAIL = (Math.random()-0.5)/1000;
+		}else{
+			MOUSE_ANGLE_DETAIL = (Math.random()-0.5)/100;
+		}
+	}else{
+		MOUSE_ANGLE_DETAIL = 0;
+	}
 
 	setShootAngle(myPlayer);
 
@@ -5595,6 +5612,7 @@ function render(renderFrame){
 
 	
 	ANGLE_MULTI = key_down(16) ? 0.1 : 1;
+	SPEED_MULTI = key_down(16) ? 0.1 : 1;
 	
 	
 	if(curplayer.type == TYPE_HELI){
@@ -5665,11 +5683,11 @@ function render(renderFrame){
 				setAngle(myPlayer, curplayer.angle);
 			}
 			if(key_down(87)){ // 'W'
-				curplayer.internal_speed += 0.5;
+				curplayer.internal_speed += 0.5*SPEED_MULTI;
 				setSpeed(myPlayer, curplayer.internal_speed);
 			}
 			if(key_down(83)){ // 'S'
-				curplayer.internal_speed -= 1.5;
+				curplayer.internal_speed -= 1.5*SPEED_MULTI;
 				setSpeed(myPlayer, curplayer.internal_speed);
 			}
 		}
@@ -6595,9 +6613,7 @@ function render(renderFrame){
 		}else if(curweapon == WEAPON_BOMB){
 			maxframes = BOMB_FUSETIME;
 		}
-		console.log(maxframes);
 
-		
 		let trajectory_points = [];
 		
 
@@ -8800,6 +8816,7 @@ function onDocumentMouseMove(event){
 			
 			MOUSE_DIST = get_dist_2d(SCREEN_MID_X, SCREEN_MID_Y, MOUSE_X, MOUSE_Y);
 		//}
+
 	
 
 		if(!players.length){
