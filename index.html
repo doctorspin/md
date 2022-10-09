@@ -1760,10 +1760,12 @@ var WEAPON_BOMB_LASER = 3;
 
 // index = current weapon index.
 var WEAPON_COLORS = [
-	{edge: 0xFF8800, middle: 0xFFFF00}, // planegun
-	{edge: 0x006600, middle: 0xFFFFFF}, // shotgun
-	{edge: 0xFF0000, middle: 0xFFFF00}, // bomb
-	{edge: 0xFF00FF, middle: 0xFFFFFF}, // bomb_laser
+	// colors from furthest to the center.
+	{edge2: 0xFF0000, edge: 0xFF8800, middle: 0xFFFF00}, // planegun
+	{edge2: 0xFF0000, edge: 0x006600, middle: 0xFFFFFF}, // shotgun
+	{edge2: 0xFF0000, edge: 0xFF0000, middle: 0xFFFF00}, // bomb
+	{edge2: 0xFF0000, edge: 0xFF00FF, middle: 0xFFFFFF}, // bomb_laser
+	//{edge2: 0xFF0000, edge: 0xFF8800, middle: 0xFFFF00}, // bomb_laser
 ];
 
 
@@ -2292,25 +2294,39 @@ function add_player(mesh, type){
 	let current2 = 0;
 	
 	let weapon_color = WEAPON_COLORS[current1];
-
+	
+	// "leftest"
+	let trajectory_mesh4 = create_trajectory_mesh(weapon_color.edge2);
+	trajectory_mesh4.visible = false; // hide before using it.
+	trajectory_mesh4.frustumCulled = false;
+	
 	// "left"
 	let trajectory_mesh2 = create_trajectory_mesh(weapon_color.edge);
 	trajectory_mesh2.visible = false; // hide before using it.
 	trajectory_mesh2.frustumCulled = false;
-	scene.add(trajectory_mesh2);
-	
+
 	// middle
 	let trajectory_mesh = create_trajectory_mesh(weapon_color.middle);
 	trajectory_mesh.visible = false; // hide before using it.
 	trajectory_mesh.frustumCulled = false;
-	scene.add(trajectory_mesh);
 	
 	// "right"
 	let trajectory_mesh3 = create_trajectory_mesh(weapon_color.edge);
 	trajectory_mesh3.visible = false; // hide before using it.
 	trajectory_mesh3.frustumCulled = false;
-	scene.add(trajectory_mesh3);
 	
+	// "rightest"
+	let trajectory_mesh5 = create_trajectory_mesh(weapon_color.edge2);
+	trajectory_mesh5.visible = false; // hide before using it.
+	trajectory_mesh5.frustumCulled = false;
+	
+	// the order of these will matter rendering.
+	scene.add(trajectory_mesh4);
+	scene.add(trajectory_mesh2);
+	
+	scene.add(trajectory_mesh3);
+	scene.add(trajectory_mesh5);
+	scene.add(trajectory_mesh);
 	
 	players.push({
 		'nick': randomNick(),
@@ -2338,6 +2354,8 @@ function add_player(mesh, type){
 		'trajectory_mesh': trajectory_mesh,
 		'trajectory_mesh2': trajectory_mesh2,
 		'trajectory_mesh3': trajectory_mesh3,
+		'trajectory_mesh4': trajectory_mesh4,
+		'trajectory_mesh5': trajectory_mesh5,
 		
 		'lane': 0, // -1, 0, 1 possible.
 		'ammo': 1000000,
@@ -5660,7 +5678,10 @@ function get_trajectory_points(){
 
 
 
-function create_edge_points(trajectory_points){
+function create_edge_points(trajectory_points, radius){
+	if(typeof radius === "undefined"){
+		radius = 0.8;
+	}
 	let trajectory_points2 = [];
 	let trajectory_points3 = [];
 	for(let i = 0; i < trajectory_points.length; i++){
@@ -5673,16 +5694,16 @@ function create_edge_points(trajectory_points){
 		let angle = get_angle(cur_point.x, cur_point.z, next_point.x, next_point.z);
 		let left_dire = new get_kxy_angle(angle-90);
 		let right_dire = new get_kxy_angle(angle+90);
-		let radius = (1/camera.zoom)*0.8; // *0.8 is best, doesnt leave holes in middle of line.
+		let r = (1/camera.zoom)*radius; // radius<=0.8 is best, doesnt leave holes in middle of line.
 		trajectory_points2.push({
-			'x': cur_point.x+left_dire.x*radius,
+			'x': cur_point.x+left_dire.x*r,
 			'y': cur_point.y,
-			'z': cur_point.z+left_dire.z*radius,
+			'z': cur_point.z+left_dire.z*r,
 		});
 		trajectory_points3.push({
-			'x': cur_point.x+right_dire.x*radius,
+			'x': cur_point.x+right_dire.x*r,
 			'y': cur_point.y,
-			'z': cur_point.z+right_dire.z*radius,
+			'z': cur_point.z+right_dire.z*r,
 		});
 	}
 	return {
@@ -6761,6 +6782,8 @@ function render(renderFrame){
 			player.trajectory_mesh.visible = false;
 			player.trajectory_mesh2.visible = false;
 			player.trajectory_mesh3.visible = false;
+			player.trajectory_mesh4.visible = false;
+			player.trajectory_mesh5.visible = false;
 		}
 	} // players
 	
@@ -6773,11 +6796,14 @@ function render(renderFrame){
 		let player = players[myPlayer];
 		let trajectory_points = get_trajectory_points();
 		
-		let edge_points = create_edge_points(trajectory_points);
-
-		update_trajectory(player.trajectory_mesh, trajectory_points);
+		let edge_points = create_edge_points(trajectory_points, 1);
+		let edge_points2 = create_edge_points(trajectory_points, 1.2*2);
+		
+		update_trajectory(player.trajectory_mesh4, edge_points2.left);
 		update_trajectory(player.trajectory_mesh2, edge_points.left);
+		update_trajectory(player.trajectory_mesh, trajectory_points);
 		update_trajectory(player.trajectory_mesh3, edge_points.right);
+		update_trajectory(player.trajectory_mesh5, edge_points2.right);
 	}
 
 
