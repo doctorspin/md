@@ -312,6 +312,16 @@ html, body {
 
 <script>
 
+/*
+{ // doesnt seem to work on three.js ?
+	let w = document.documentElement.clientWidth * window.devicePixelRatio;
+	viewport = document.querySelector("meta[name=viewport]");
+	viewport.setAttribute('content', 'width=' + w);
+
+	document.documentElement.style.transform = 'scale( 1 / window.devicePixelRatio )';
+	document.documentElement.style.transformOrigin = 'top left';
+}
+*/
 
 
 
@@ -1052,16 +1062,16 @@ var GRAVITY_DEFAULT = {
 // todo: remove this and use map.json to define pieces...
 
 let PLANETS = [
-	{x:0,     y:0, 		range:10000, minradius:2500},
-	{x:12000, y:8000, 		range:10000, minradius:2500},
-	{x:12700,  y:-12700, range:10000, minradius:2500},
+	{x:0,     z:0, 		 range:10000, minradius:2500, kx:0, kz:0},
+	{x:12000, z:8000, 	 range:10000, minradius:2500, kx:0, kz:0},
+	{x:12700,  z:-12700, range:10000, minradius:2500, kx:0, kz:0},
 	
-	{x:-8342,  y:12594, range:10000, minradius:2500},
-	{x:-14837,  y:41, range:10000, minradius:2500},
-	{x:-6445,  y:-19452, range:10000, minradius:2500},
+	{x:-8342,  z:12594,  range:10000, minradius:2500, kx:0, kz:0},
+	{x:-14837,  z:41,    range:10000, minradius:2500, kx:0, kz:0},
+	{x:-6445,  z:-19452, range:10000, minradius:2500, kx:0, kz:0},
 	
-	{x:-42800,  y:-4548, range:10000, minradius:2500},
-	{x:-2445,  y:-49452, range:10000, minradius:2500},
+	{x:-42800,  z:-4548, range:10000, minradius:2500, kx:0, kz:0},
+	{x:-2445,  z:-49452, range:10000, minradius:2500, kx:0, kz:0},
 ];
 
 
@@ -1719,7 +1729,7 @@ let AIR_RESISTANCE = 1;//0.995; // kx multiplied by this on air.
 let WATER_RESISTANCE = 0.97; // kx multiplied by this in water.
 
 
-let MAX_TEX_SIZE = 1024; // will be initialized at pre_init
+let MAX_TEX_SIZE = 0; // will be initialized at pre_init
 
 let antialiasing = true;
 
@@ -1758,15 +1768,54 @@ var WEAPON_SHOTGUN = 1;
 var WEAPON_BOMB = 2;
 var WEAPON_BOMB_LASER = 3;
 
+
+let FPS = 60;
+
+let PROJECTILE_MAX_FRAMES = 120*FPS;
+
+// how long (player) projectiles will be alive in frames:
+let SHOT_FUSETIME = 20*FPS;
+let BOMB_FUSETIME = 120*FPS;
+let BOMB_LASER_FUSETIME = 8*120*FPS;
+
+// turrets fusetimes:
+let TURRET_ANTIAIR_FUSETIME = 4*FPS;
+let TURRET_BOMBER_FUSETIME = 3*FPS;
+
+let TURRET_ANTIAIR_RANGE = 1200; // how far turrets can shoot by default.
+let TURRET_BOMBER_RANGE = 1500;
+
+
 // index = current weapon index.
-var WEAPON_COLORS = [
-	// colors from furthest to the center.
-	{edge2: 0xFF0000, edge: 0xFF8800, middle: 0xFFFF00}, // planegun
-	{edge2: 0xFF0000, edge: 0x006600, middle: 0xFFFFFF}, // shotgun
-	{edge2: 0xFF0000, edge: 0xFF0000, middle: 0xFFFF00}, // bomb
-	{edge2: 0xFF0000, edge: 0xFF00FF, middle: 0xFFFFFF}, // bomb_laser
-	//{edge2: 0xFF0000, edge: 0xFF8800, middle: 0xFFFF00}, // bomb_laser
-];
+var WEAPON_INFO = {};
+{
+	WEAPON_INFO[WEAPON_PLANEGUN] = {
+		// colors from furthest to the center.
+		// trajectory_mesh = middle, trajectory_mesh2-3 = edge, trajectory_mesh4-5 = edge2.
+		'colors': {edge2: 0xFF0000, edge: 0xFF8800, middle: 0xFFFF00}, // for trajectory (and maybe some other stuff too).
+		'visible_name': "Machinegun",
+		'fusetime': SHOT_FUSETIME, // these not used here atm.
+	};
+
+	WEAPON_INFO[WEAPON_SHOTGUN] = {
+		'colors': {edge2: 0xFF0000, edge: 0x006600, middle: 0xFFFFFF},
+		'visible_name': "Shotgun",
+		'fusetime': SHOT_FUSETIME, // these not used here atm.
+	};
+
+	WEAPON_INFO[WEAPON_BOMB] = {
+		'colors': {edge2: 0xFF0000, edge: 0xFF0000, middle: 0xFFFF00},
+		'visible_name': "Bomb",
+		'fusetime': BOMB_FUSETIME, // these not used here atm.
+	};
+
+	WEAPON_INFO[WEAPON_BOMB_LASER] = {
+		'colors': {edge2: 0xFF0000, edge: 0xFF00FF, middle: 0xFFFFFF},
+		//'colors': {edge2: 0xFF0000, edge: 0xFF8800, middle: 0xFFFF00}, // bomb_laser
+		'visible_name': "Wonky Laser Bomb (WLB)",
+		'fusetime': BOMB_LASER_FUSETIME, // these not used here atm.
+	};
+}
 
 
 // explosion types:
@@ -2005,22 +2054,6 @@ var bombers = [];
 var turrets = []; // can be antiair or regular turret.
 var visuals = []; // glow sprites etc... works same way as explosions basically.
 
-let FPS = 60;
-
-let PROJECTILE_MAX_FRAMES = 120*FPS;
-
-// how long (player) projectiles will be alive in frames:
-let SHOT_FUSETIME = 20*FPS;
-let BOMB_FUSETIME = 8*120*FPS;
-let BOMB_LASER_FUSETIME = 8*120*FPS;
-
-// turrets fusetimes:
-let TURRET_ANTIAIR_FUSETIME = 4*FPS;
-let TURRET_BOMBER_FUSETIME = 3*FPS;
-
-let TURRET_ANTIAIR_RANGE = 1200; // how far turrets can shoot by default.
-let TURRET_BOMBER_RANGE = 1500;
-
 
 
 
@@ -2075,6 +2108,46 @@ function point_inside_rect(x, y,  x1, y1, x2, y2){
 }
 
 
+// transfer of masses between balls:
+// https://stackoverflow.com/questions/60727534/balls-bouncing-off-of-each-other
+// 
+
+// other algorith:
+//https://stackoverflow.com/questions/57891494/how-to-calculate-intersection-point-of-a-line-on-a-circle-using-p5-js
+
+//
+// https://cscheng.info/2016/06/09/calculate-circle-line-intersection-with-javascript-and-p5js.html
+function findCircleLineIntersections(r, h, k, m, n) {
+	// circle: (x - h)^2 + (y - k)^2 = r^2
+	// line: y = m * x + n
+	// r: circle radius
+	// h: x value of circle centre
+	// k: y value of circle centre
+	// m: slope
+	// n: y-intercept
+
+	// get a, b, c values
+	var a = 1 + m*m;
+	var b = -h*2 + (m*(n-k))*2;
+	var c = h*h + (n-k)*(n-k) - r*r;
+
+	// get discriminant
+	var d = b*b - 4*a*c;
+	if(d >= 0){
+		// insert into quadratic formula
+		var intersections = [
+			(-b + Math.sqrt(b*b - 4*a*c)) / (2*a),
+			(-b - Math.sqrt(b*b - 4*a*c)) / (2*a)
+		];
+		if(d == 0){
+			// only 1 intersection
+			return [intersections[0]];
+		}
+		return intersections;
+	}
+	// no intersection
+	return [];
+}
 
 
 // radtodeg get_degs
@@ -2293,30 +2366,31 @@ function add_player(mesh, type){
 	let current1 = 3;
 	let current2 = 0;
 	
-	let weapon_color = WEAPON_COLORS[current1];
+	let weaponinfo = WEAPON_INFO[weapons1[current1]];
+	let weapon_colors = weaponinfo.colors;
 	
 	// "leftest"
-	let trajectory_mesh4 = create_trajectory_mesh(weapon_color.edge2);
+	let trajectory_mesh4 = create_trajectory_mesh(weapon_colors.edge2);
 	trajectory_mesh4.visible = false; // hide before using it.
 	trajectory_mesh4.frustumCulled = false;
 	
 	// "left"
-	let trajectory_mesh2 = create_trajectory_mesh(weapon_color.edge);
+	let trajectory_mesh2 = create_trajectory_mesh(weapon_colors.edge);
 	trajectory_mesh2.visible = false; // hide before using it.
 	trajectory_mesh2.frustumCulled = false;
 
 	// middle
-	let trajectory_mesh = create_trajectory_mesh(weapon_color.middle);
+	let trajectory_mesh = create_trajectory_mesh(weapon_colors.middle);
 	trajectory_mesh.visible = false; // hide before using it.
 	trajectory_mesh.frustumCulled = false;
 	
 	// "right"
-	let trajectory_mesh3 = create_trajectory_mesh(weapon_color.edge);
+	let trajectory_mesh3 = create_trajectory_mesh(weapon_colors.edge);
 	trajectory_mesh3.visible = false; // hide before using it.
 	trajectory_mesh3.frustumCulled = false;
 	
 	// "rightest"
-	let trajectory_mesh5 = create_trajectory_mesh(weapon_color.edge2);
+	let trajectory_mesh5 = create_trajectory_mesh(weapon_colors.edge2);
 	trajectory_mesh5.visible = false; // hide before using it.
 	trajectory_mesh5.frustumCulled = false;
 	
@@ -3010,7 +3084,7 @@ function load_map_behind(path){
 				let mscale = 1;
 				behindMesh.position.x = PLANETS[i].x;
 				behindMesh.position.y = randomized_y(Z_MAP_BEHIND);
-				behindMesh.position.z = PLANETS[i].y;
+				behindMesh.position.z = PLANETS[i].z;
 				
 				behindMesh.rotation.x = -Math.PI/2;
 				//behindMesh.scale.set(mscale,mscale,mscale);
@@ -3070,7 +3144,7 @@ function load_map_front(path){
 				let mscale = 1;
 				mesh.position.x = PLANETS[i].x;
 				mesh.position.y = Z_MAP_FRONT;
-				mesh.position.z = PLANETS[i].y;
+				mesh.position.z = PLANETS[i].z;
 				
 				mesh.rotation.x = -Math.PI/2;
 				mesh.scale.set(mscale,mscale,mscale);
@@ -3435,7 +3509,7 @@ function load_map_collision(path){
 				let planet = PLANETS[i];
 				let collisiondata = {
 					'x': planet.x,
-					'z': planet.y,
+					'z': planet.z,
 					'w': tex.image.width,
 					'h': tex.image.height,
 					'kx': 0,
@@ -3445,7 +3519,7 @@ function load_map_collision(path){
 				COLLISION_DATA['MAP_DATA'].push(collisiondata);
 				GRAVITY.points.push({
 					'x': planet.x,
-					'z': planet.y,
+					'z': planet.z,
 					'kx': 0,
 					'kz': 0,
 					'range': planet.range,
@@ -3453,7 +3527,7 @@ function load_map_collision(path){
 				});
 				console.warn("gravity.points.push", {
 					'x': planet.x,
-					'z': planet.y,
+					'z': planet.z,
 					'range': planet.range,
 					'minradius': planet.minradius,
 				});
@@ -5570,30 +5644,30 @@ function apply_gravity(obj){
 }
 
 
-function get_force_for_planet(x, z, point){
-	let dist = get_dist_2d(x, z, point.x, point.z);
-	if(dist > point.range){
-		//dist = point.range;
-	}
-
+function get_force_for_planet(target, curplanet){
+	let dist = get_dist_2d(target.x, target.z, curplanet.x, curplanet.z);
 	
-	if(dist < point.minradius){
-		dist = point.minradius;
+	let dist_percent = dist/curplanet.minradius;
+	if(dist_percent > 1) dist_percent = 1;
+	
+	if(dist < curplanet.minradius){
+		dist = curplanet.minradius;
 	}
 	
-	return GRAVITY.value * ((6000000)/(dist*dist));
+	return GRAVITY.value * ((6000000*dist_percent)/(dist*dist));
 }
 
-function apply_gravity_to_planet(x, z, obj, this_planet_index){
-	for(let i = 0; i < GRAVITY.points.length; i++){
+function apply_gravity_to_planet(this_planet_index){
+	let target = PLANETS[this_planet_index];
+	for(let i = 0; i < PLANETS.length; i++){
 		if(i != this_planet_index){
-			let point = GRAVITY.points[i];
+			let curplanet = PLANETS[i];
 
-			let gdir = new get_kxy(x, z, point.x, point.z);
-			let force = get_force_for_planet(x, z, point);
+			let gdir = new get_kxy(target.x, target.z, curplanet.x, curplanet.z);
+			let force = get_force_for_planet(target, curplanet);
 
-			obj.kx += gdir.x*force;
-			obj.kz += gdir.z*force;
+			target.kx += gdir.x*force;
+			target.kz += gdir.z*force;
 		}
 	}
 }
@@ -6799,6 +6873,7 @@ function render(renderFrame){
 		let edge_points = create_edge_points(trajectory_points, 1);
 		let edge_points2 = create_edge_points(trajectory_points, 1.2*2);
 		
+		// doesnt really affect performance 1 or 5 lines.
 		update_trajectory(player.trajectory_mesh4, edge_points2.left);
 		update_trajectory(player.trajectory_mesh2, edge_points.left);
 		update_trajectory(player.trajectory_mesh, trajectory_points);
@@ -7202,38 +7277,56 @@ function render(renderFrame){
 
 
 	if(PLANET_GRAVITY){
+			
+		// apply gravity:
 		for(let i = 0; i < PLANETS.length; i++){
-			let behindMesh = behindMeshes[i];
-			let behindMeshData = behindMeshesData[i];
-			
-			let collisionMesh = collisionMeshes[i];
-			let collisionMeshData = collisionMeshesData[i];
-			
-			let collisionData = COLLISION_DATA['MAP_DATA'][i];
-			
-			//console.log(stringify(behindMesh.position));
-			//console.log(stringify(behindMeshData));
-			//console.log(stringify(collisionMesh.position));
-			//console.log(stringify(collisionMeshData));
-			//console.log(collisionData.x.toFixed(2), collisionData.z.toFixed(2), collisionData.kx.toFixed(2), collisionData.kz.toFixed(2));
-			
-			
-			collisionData.x += collisionData.kx;
-			collisionData.z += collisionData.kz;
-			
-			GRAVITY.points[i].x = collisionData.x;
-			GRAVITY.points[i].z = collisionData.z;
-			behindMesh.position.x = collisionData.x;
-			behindMesh.position.z = collisionData.z;
-			collisionMesh.position.x = collisionData.x;
-			collisionMesh.position.z = collisionData.z;
-			
-			apply_gravity_to_planet(behindMesh.position.x, behindMesh.position.z, behindMeshData, i);
-			apply_gravity_to_planet(collisionMesh.position.x, collisionMesh.position.z, collisionMeshData, i);
-			apply_gravity_to_planet(collisionData.x, collisionData.z, collisionData, i);
-			apply_gravity_to_planet(GRAVITY.points[i].x, GRAVITY.points[i].z, GRAVITY.points[i], i);
+			apply_gravity_to_planet(i);
 		}
+		
+		// apply movement:
+		for(let i = 0; i < PLANETS.length; i++){
+			let planet = PLANETS[i];
+			let collisionData = COLLISION_DATA['MAP_DATA'][i];
+			let behindMesh = behindMeshes[i];
+			let collisionMesh = collisionMeshes[i];			
+
+			planet.x += planet.kx;
+			planet.z += planet.kz;
+			
+			// update all objects positions linked to planets:
+			collisionData.x = planet.x;
+			collisionData.z = planet.z;
+			GRAVITY.points[i].x = planet.x;
+			GRAVITY.points[i].z = planet.z;
+			behindMesh.position.x = planet.x;
+			behindMesh.position.z = planet.z;
+			collisionMesh.position.x = planet.x;
+			collisionMesh.position.z = planet.z;
+		}
+		
+		// apply collisions:
+		for(let i = 0; i < PLANETS.length; i++){
+			let planet = PLANETS[i];
+			let planet_test_radius = planet.minradius*2; // 2x planet radius for collision detection.
+			
+			for(let ii = 0; ii < PLANETS.length; ii++){
+				if(ii != i){
+					if(point_inside_circle(planet.x, planet.z, PLANETS[ii].x, PLANETS[ii].z, planet_test_radius)){
+						planet.kx = -planet.kx;
+						planet.kz = -planet.kz;
+						//PLANETS[ii].kx = -PLANETS[ii].kx;
+						//PLANETS[ii].kz = -PLANETS[ii].kz;
+						break;
+					}
+				}
+			}
+		}
+
 	}
+	
+	
+	
+	
 
 	if(camstyle == 0){
 		/////////////////
@@ -8219,21 +8312,47 @@ function create_trajectory_mesh(color){
 	let geometry = new THREE.BufferGeometry().setFromPoints(points);
 	// LineBasicMaterial or LineDashedMaterial
 	let material = new THREE.LineBasicMaterial({color: color});
-	// dashed doesnt seem to work;
+	// dashed doesnt seem to work at all:
 	//let material = new THREE.LineDashedMaterial({color: color, linewidth: 1, scale: 1, dashSize: 3, gapSize: 1});
-
+	
+	//There are three hints for how frequently the user will be changing the buffer's data.
+	//STATIC: The user will set the data once.
+	//DYNAMIC: The user will set the data occasionally.
+	//STREAM: The user will be changing the data after every use. Or almost every use.
+	geometry.attributes.position.setUsage(THREE.StreamDrawUsage);
+	//material.opacity = 0.8; // dont use -> low opacity looks bad but is useful, and high opacity looks good but is useless.
+	//material.transparent = true;
+	
 	//material.linewidth = 4; // only size 1 is supported on most browsers.
 	// see https://threejs.org/examples/webgl_lines_fat for thicker lines.
 	let line = new THREE.Line(geometry, material);
+	//line.name = random_str(20);
 	return line;
 }
 
+
+function change_player_trajectory_colors(weaponcolors){
+	let myplayer = players[myPlayer];
+	let trajs = [
+		[myplayer.trajectory_mesh4, weaponcolors.edge2],
+		[myplayer.trajectory_mesh2, weaponcolors.edge],
+		[myplayer.trajectory_mesh, weaponcolors.middle],
+		[myplayer.trajectory_mesh3, weaponcolors.edge],
+		[myplayer.trajectory_mesh5, weaponcolors.edge2],
+	];
+	for(let i = 0; i < trajs.length; i++){
+		trajs[i][0].material.color = new THREE.Color(trajs[i][1]);
+		trajs[i][0].material.needsUpdate = true;
+	}
+}
 
 
 function update_trajectory(trajectory_mesh, new_points){
 	let vertices = trajectory_mesh.geometry.attributes.position.array;
 	
 	let last_point = new_points[new_points.length-1];
+	
+	trajectory_mesh.geometry.attributes.position.count = vertices.length/3;
 	
 	for(let v = 0, p = 0; v <= vertices.length; v+=3, p++){
 		if(p > new_points.length-1){
@@ -8242,6 +8361,8 @@ function update_trajectory(trajectory_mesh, new_points){
 			vertices[v+0] = last_point.x;
 			vertices[v+1] = last_point.y;
 			vertices[v+2] = last_point.z;
+			trajectory_mesh.geometry.attributes.position.count = p;
+			break;
 		}else{
 			if(p < new_points.length){
 				vertices[v+0] = new_points[p].x;
@@ -8252,6 +8373,8 @@ function update_trajectory(trajectory_mesh, new_points){
 			}
 		}
 	}
+	
+	//console.log(trajectory_mesh.geometry.attributes);
 	
 	trajectory_mesh.geometry.attributes.position.needsUpdate = true;
 	trajectory_mesh.visible = true; // show mesh.
@@ -9093,40 +9216,49 @@ function onDocumentWheel(event){
 }
 
 
+function get_current_weaponinfo(){
+	if(players.length > 0){
+		let myplayer = players[myPlayer];
+		return WEAPON_INFO[myplayer.weapons1[myplayer.current1]];
+	}else{
+		return null;
+	}
+}
 
 
 document.addEventListener("mousedown", onDocumentMouseDown, false);
 function onDocumentMouseDown(event){
-	if(!game_paused && gameLoadedVar){
+	if(!game_paused && gameLoadedVar && players.length > 0){
+		let myplayer = players[myPlayer];
+		
 		if(event.button == 0){ // left click leftclick
-			if(players.length > 0){
-				shoot_from_myplayer();
-				prevShootTime = getTimeMillis();
-				shooting_started = true;
-				prevShootStartTime = getTimeMillis();
-			}
-			
+			shoot_from_myplayer();
+			prevShootTime = getTimeMillis();
+			shooting_started = true;
+			prevShootStartTime = getTimeMillis();
+
 			//push_message("Clicked at: "+MOUSE_X+", "+MOUSE_Y);
 		
 		}else if(event.button == 1){ // middle click
 			// change primary weapon:
-			if(players.length > 0){
-				players[myPlayer].current1++;
-				if(players[myPlayer].current1 >= players[myPlayer].weapons1.length){
-					players[myPlayer].current1 = 0;
-				}
+
+			myplayer.current1++;
+			if(myplayer.current1 >= myplayer.weapons1.length){
+				myplayer.current1 = 0;
 			}
 			
+			let weaponinfo = get_current_weaponinfo();
+			push_message("Weapon: "+weaponinfo.visible_name);
+			change_player_trajectory_colors(weaponinfo.colors);
+
 		}else if(event.button == 2){ // right click
 			// flip plane:
 
-			if(players.length > 0){
-				if(players[myPlayer].type == TYPE_PLANE || players[myPlayer].type == TYPE_HELI){
-					if(!plane_flipping){
-						plane_flipping = 1;
-					
-						play_sound("plane_flip", players[myPlayer].x, players[myPlayer].z);
-					}
+			if(myplayer.type == TYPE_PLANE || myplayer.type == TYPE_HELI){
+				if(!plane_flipping){
+					plane_flipping = 1;
+				
+					play_sound("plane_flip", myplayer.x, myplayer.z);
 				}
 			}
 		}
