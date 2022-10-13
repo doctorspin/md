@@ -49,6 +49,7 @@ sdeg: 105.35473869
 13.10.
 - fixed turrets rotation bug(?).
 - added small planets for testing.
+- fixed player offset bug. todo: make offset according to rotation.
 - quickfix to soldier rotation. todo: make it flip according to gravity.
 - quickfix to santa rotation. todo: make it flip according to gravity.
 
@@ -974,7 +975,7 @@ var ZIN = -ZINSTEP*total_layers;
 // create new Z-index value
 function NEWZIN(){
 	ZIN += ZINSTEP;
-	console.log("newzin = "+(ZIN-ZINSTEP));
+	//console.log("newzin = "+(ZIN-ZINSTEP));
 	return ZIN-ZINSTEP;
 }
 // randomized zin value is needed to avoid rendering glitches when zin values are exactly same.
@@ -2188,6 +2189,11 @@ function rad2deg(rad){
 // degtorad() get_rads
 function deg2rad(deg){
 	return deg*(Math.PI/180);
+}
+
+// used to check which side of a line a dot lays on.
+function dotprod(x, y, x1, y1, x2, y2){
+	return (x-x1)*(y2-y1)-(y-y1)*(x2-x1);
 }
 
 
@@ -3509,8 +3515,8 @@ function load_map_collision(path, planet_type){
 	console.log("load_map_collision: "+path);
 	return new THREE.TextureLoader().load(path, function(tex){
 		tex.image = correct_texture_size(tex.image);
-		console.warn("GRAVITY.points", stringify(GRAVITY.points));
-		console.warn("loaded", stringify(loaded));
+		//console.warn("GRAVITY.points", stringify(GRAVITY.points));
+		//console.warn("loaded", stringify(loaded));
 		set_loading_desc("Map loaded");
 		
 
@@ -3570,12 +3576,14 @@ function load_map_collision(path, planet_type){
 					});
 					PLANET2GRAVITY[i] = GRAVITY.points.length-1;
 					
+					/*
 					console.warn("gravity.points.push", {
 						'x': planet.x,
 						'z': planet.z,
 						'range': planet.range,
 						'minradius': planet.minradius,
 					});
+					*/
 					
 					let mesh = new THREE.Mesh(geometry, material);
 
@@ -5588,6 +5596,42 @@ function frameNumber(){
 	return frameNumber_val;
 }
 
+function get_closest_gravity_angle(x,z){
+	if(GRAVITY.style == GRAVITY_CIRCULAR){
+		let kx = 0;
+		let kz = 0;
+		let mindist = null;
+		let min_point_index = 0;
+		// find closest gravity point:
+		for(let i = 0; i < GRAVITY.points.length; i++){
+			let dist = get_dist_2d(x, z, GRAVITY.points[i].x, GRAVITY.points[i].z);
+			if(mindist == null){
+				mindist = dist;
+				min_point_index = i;
+			}
+			if(dist < mindist){
+				min_point_index = i;
+				mindist = dist;
+			}
+		}
+		
+		let point = GRAVITY.points[min_point_index];
+		//console.log("min_point_index = "+min_point_index);
+		//console.log(point);
+		
+		let dire = new get_kxy(x, z, point.x, point.z);
+		let force = get_force(x, z, point);
+		kx += dire.x*force;
+		kz += dire.z*force;
+	
+		//let a = get_angle(x, z, GRAVITY.point.x, GRAVITY.point.z);
+		// must be set after lookAt(), and as fixed value rather than addition/substraction.
+		// no idea why needs 90 degree change..
+		return 90-get_angle(0,0,kx,kz);
+	}else{
+		return 0;
+	}
+}
 
 function get_gravity_angle(x,z){
 	if(GRAVITY.style == GRAVITY_CIRCULAR){
@@ -6731,6 +6775,15 @@ function render(renderFrame){
 		
 			// handle lane changes:
 			
+			let gangle_pre = get_closest_gravity_angle(player.x, player.z);
+			let gangle = 90-gangle_pre;
+			let gdir = new get_kxy_angle(gangle);
+			let gdir2 = new get_kxy_angle(gangle-180);
+			
+			let pdir = new get_kxy_angle(gangle_pre);
+			let pdir2 = new get_kxy_angle(gangle_pre-180);
+
+
 			let virtual_y = player.y;
 			
 			if(player.lane == 1){
@@ -6761,13 +6814,20 @@ function render(renderFrame){
 				}
 			}else if(player.type == TYPE_SOLDIER){
 				let dire = new get_kxy_angle(player.angle);
+				
+				let dire2 = new get_kxy_angle(90-player.angle);
 			
+
+				if(dotprod(
+					player.x+dire2.x*2, player.z+dire2.z*2, 
+					player.x+gdir.x*10, player.z+gdir.z*10, 
+					player.x+gdir2.x*10, player.z+gdir2.z*10) > 0){
+					dir = -1;
+				}
+				
 				player.x += dire.x*player.speed;
 				player.z += dire.z*player.speed;
-				
-				//if(dire.x < 0){
-				//	dir = -1;
-				//}
+		
 				
 			}else{
 				let dire = new get_kxy_angle(player.angle);
@@ -6849,12 +6909,23 @@ function render(renderFrame){
 					}else{
 						//player.mesh.scale.x = 1;
 					}
+				}else if(player.type == TYPE_SOLDIER){
+					if(dir < 0){
+						//player.mesh.scale.x = -1;
+					}else{
+						//player.mesh.scale.x = 1;
+					}
 				}
 			}
 			
+
 			
 			if(player.type == TYPE_SOLDIER){
-				let ground_found = is_ground(player.x, player.z);
+				// todo: add z offset according to gravity.
+				let player_h = 17;
+				let xoff = gdir.x*player_h;
+				let zoff = gdir.z*player_h;
+				let ground_found = is_ground(player.x+xoff, player.z+zoff);
 					
 				if(ground_found){
 					player.kx = 0;
@@ -6882,8 +6953,8 @@ function render(renderFrame){
 				}
 			}
 			
-			let gangle = 180-get_gravity_angle(player.x, player.z);
-			let angle_diff = (player.angle+180)-gangle;
+			//let gangle = 180-get_gravity_angle(player.x, player.z);
+			//let angle_diff = (player.angle+180)-gangle;
 			
 			//player.angle += angle_diff/100;
 			
@@ -7637,7 +7708,7 @@ function explode_at(x, z, type, size, glowing, glowcolor){
 		mesh.visible = true;
 	}
 	
-	let gangle = get_gravity_angle(x,z);
+	let gangle = get_closest_gravity_angle(x,z);
 	
 	mesh.rotation.x = Math.PI/2;
 	if(random_rotation){
