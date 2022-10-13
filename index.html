@@ -6780,8 +6780,8 @@ function render(renderFrame){
 			let gdir = new get_kxy_angle(gangle);
 			let gdir2 = new get_kxy_angle(gangle-180);
 			
-			let pdir = new get_kxy_angle(gangle_pre);
-			let pdir2 = new get_kxy_angle(gangle_pre-180);
+			//let pdir = new get_kxy_angle(gangle_pre);
+			//let pdir2 = new get_kxy_angle(gangle_pre-180);
 
 
 			let virtual_y = player.y;
@@ -6815,15 +6815,14 @@ function render(renderFrame){
 			}else if(player.type == TYPE_SOLDIER){
 				let dire = new get_kxy_angle(player.angle);
 				
+				/*
 				let dire2 = new get_kxy_angle(90-player.angle);
-			
-
 				if(dotprod(
 					player.x+dire2.x*2, player.z+dire2.z*2, 
 					player.x+gdir.x*10, player.z+gdir.z*10, 
 					player.x+gdir2.x*10, player.z+gdir2.z*10) > 0){
 					dir = -1;
-				}
+				}*/
 				
 				player.x += dire.x*player.speed;
 				player.z += dire.z*player.speed;
