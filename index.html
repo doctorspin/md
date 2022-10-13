@@ -46,7 +46,13 @@ y: -59478.2
 z: 2189.0
 sdeg: 105.35473869
 
-10.10
+13.10.
+- fixed turrets rotation bug(?).
+- added small planets for testing.
+- quickfix to soldier rotation. todo: make it flip according to gravity.
+- quickfix to santa rotation. todo: make it flip according to gravity.
+
+10.10.
 - possible to change bullet speed by R/F buttons.
 - possible to enable planet gravity by O button.
 - displaying current weapon when changing weapon.
@@ -6843,12 +6849,6 @@ function render(renderFrame){
 					}else{
 						//player.mesh.scale.x = 1;
 					}
-				}else{
-					if(dir < 0){
-						player.mesh.scale.y = 1;
-					}else{
-						player.mesh.scale.y = -1;
-					}
 				}
 			}
 			
@@ -6898,6 +6898,8 @@ function render(renderFrame){
 			}else if(player.type == TYPE_SOLDIER){
 				player.mesh.rotation.z = deg2rad(player.angle-180);
 				//player.mesh.rotation.z = deg2rad(gangle);
+			}else if(player.type == TYPE_SANTA){
+				player.mesh.rotation.z = deg2rad(player.angle-180);
 			}else{
 				player.mesh.rotation.z = deg2rad(player.angle);
 			}
