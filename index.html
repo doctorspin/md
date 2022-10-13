@@ -38,6 +38,20 @@
 	<script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-7HEP5RL9MR');</script>
 
 <!--
+
+mystic trajectory:
+shot_speed_multi = 0.00005452861175150987
+x: 59687.4
+y: -59478.2
+z: 2189.0
+sdeg: 105.35473869
+
+10.10
+- possible to change bullet speed by R/F buttons.
+- possible to enable planet gravity by O button.
+- displaying current weapon when changing weapon.
+- displaying trajectory with different color on all weapons.
+
 8.10.
 - turret trajectories visible with L button.
 - shotgun bullets optimized a bit.
@@ -1062,16 +1076,19 @@ var GRAVITY_DEFAULT = {
 // todo: remove this and use map.json to define pieces...
 
 let PLANETS = [
-	{x:0,     z:0, 		 range:10000, minradius:2500, kx:0, kz:0},
-	{x:12000, z:8000, 	 range:10000, minradius:2500, kx:0, kz:0},
-	{x:12700,  z:-12700, range:10000, minradius:2500, kx:0, kz:0},
+	{x:0,     z:0, 		 range:10000, minradius:2500, kx:0, kz:0, type: "big"},
+	{x:5000,     z:0,    range:10000, minradius:500, kx:0, kz:0, type: "small"},
+	{x:6000,     z:1000,    range:10000, minradius:500, kx:0, kz:0, type: "small"},
 	
-	{x:-8342,  z:12594,  range:10000, minradius:2500, kx:0, kz:0},
-	{x:-14837,  z:41,    range:10000, minradius:2500, kx:0, kz:0},
-	{x:-6445,  z:-19452, range:10000, minradius:2500, kx:0, kz:0},
+	{x:12000, z:8000, 	 range:10000, minradius:2500, kx:0, kz:0, type: "big"},
+	{x:12700,  z:-12700, range:10000, minradius:2500, kx:0, kz:0, type: "big"},
 	
-	{x:-42800,  z:-4548, range:10000, minradius:2500, kx:0, kz:0},
-	{x:-2445,  z:-49452, range:10000, minradius:2500, kx:0, kz:0},
+	{x:-8342,  z:12594,  range:10000, minradius:2500, kx:0, kz:0, type: "big"},
+	{x:-14837,  z:41,    range:10000, minradius:2500, kx:0, kz:0, type: "big"},
+	{x:-6445,  z:-19452, range:10000, minradius:2500, kx:0, kz:0, type: "big"},
+	
+	{x:-42800,  z:-4548, range:10000, minradius:2500, kx:0, kz:0, type: "big"},
+	{x:-2445,  z:-49452, range:10000, minradius:2500, kx:0, kz:0, type: "big"},
 ];
 
 
@@ -1140,6 +1157,9 @@ function texture_path(name){
 	return urlprefix+TEXTURES[name].path;
 }
 
+function map_texture_path(filename){
+	return MAP_FOLDER+"/"+filename;
+}
 
 let default_texture_config = {
 	// stuff like linear filter, repeat, offset... etc.
@@ -1618,6 +1638,9 @@ var cloudColorTo = cloudsColorRain;
 var skyboxColorFrom = skyboxColor; // will be initialized on rain switch.
 var skyboxColorTo = skyboxColorRain;
 
+var mapCollisionSmallTex = null;
+var mapBehindSmallTex = null;
+
 var mapCollisionTex = null;
 var mapParallaxTex = null;
 var mapBehindTex = null;
@@ -1960,8 +1983,7 @@ var rainfallMesh = null;
 var behindMeshes = [];
 var collisionMeshes = [];
 
-var behindMeshesData = [];
-var collisionMeshesData = [];
+
 
 var cloudsFrontMesh = null;
 var cloudsBackMesh = null;
@@ -2167,8 +2189,8 @@ function get_kxy_angle(angle){
 	this.z = Math.cos((angle-90.0)*(Math.PI/180.0));
 }
 function get_kxy_angle_rads(rads){
-	this.x = Math.sin(rads);
-	this.z = Math.cos(rads);
+	this.x = Math.sin(rads-Math.PI/2);
+	this.z = Math.cos(rads-Math.PI/2);
 }
 
 
@@ -2180,8 +2202,8 @@ function get_kxy(from_x, from_y, to_x, to_y){
 }
 function get_kxy_rads(from_x, from_y, to_x, to_y){
 	let rads = Math.atan2(to_y-from_y, from_x-to_x);
-	this.x = Math.sin(rads);
-	this.z = Math.cos(rads);
+	this.x = Math.sin(rads-Math.PI/2);
+	this.z = Math.cos(rads-Math.PI/2);
 }
 
 
@@ -2397,16 +2419,22 @@ function add_player(mesh, type){
 	// the order of these will matter rendering.
 	scene.add(trajectory_mesh4);
 	scene.add(trajectory_mesh2);
-	
 	scene.add(trajectory_mesh3);
 	scene.add(trajectory_mesh5);
 	scene.add(trajectory_mesh);
+	
+	let angle = 0;
+	let lane = 0;
+	if(type == TYPE_SOLDIER){
+		angle = 180;
+		lane = 1;
+	}
 	
 	players.push({
 		'nick': randomNick(),
 		'color': "#FFFFFF",
 		'mesh': mesh, // includes our position also.
-		'angle': 0,
+		'angle': angle,
 		'shoot_angle': 0,
 		'speed': 0,
 		'speed_x': 0, // used for helicopters etc.
@@ -2431,7 +2459,7 @@ function add_player(mesh, type){
 		'trajectory_mesh4': trajectory_mesh4,
 		'trajectory_mesh5': trajectory_mesh5,
 		
-		'lane': 0, // -1, 0, 1 possible.
+		'lane': lane, // -1, 0, 1 possible.
 		'ammo': 1000000,
 		'bombs': 1000000,
 		'fuel': 1000000,
@@ -3059,7 +3087,7 @@ function create_fading_plane_mesh(plane_w, plane_h, material, f_top, f_bottom, f
 
 
 
-function load_map_behind(path){
+function load_map_behind(path, planet_type){
 	return new THREE.TextureLoader().load(path, function(tex){
 		tex.image = correct_texture_size(tex.image);
 		set_loading_desc("Map behind loaded");
@@ -3078,25 +3106,26 @@ function load_map_behind(path){
 			material.emissiveMap = mapBehindEmissiveTex;
 			material.emissiveIntensity = 0;
 			
+
 			for(let i = 0; i < PLANETS.length; i++){
-				let behindMesh = new THREE.Mesh(geometry, material);
-				behindMesh.visible = SHOW_MAP_BG;
-				let mscale = 1;
-				behindMesh.position.x = PLANETS[i].x;
-				behindMesh.position.y = randomized_y(Z_MAP_BEHIND);
-				behindMesh.position.z = PLANETS[i].z;
-				
-				behindMesh.rotation.x = -Math.PI/2;
-				//behindMesh.scale.set(mscale,mscale,mscale);
-				behindMesh.scale.set(mapscale.x,mapscale.y,mapscale.z);
-				scene.add(behindMesh);
-				
-				behindMeshes.push(behindMesh);
-				behindMeshesData.push({
-					kx: 0,
-					kz: 0,
-				});
+				let planet = PLANETS[i];
+				if(planet.type == planet_type){
+					let behindMesh = new THREE.Mesh(geometry, material);
+					behindMesh.visible = SHOW_MAP_BG;
+					let mscale = 1;
+					behindMesh.position.x = planet.x;
+					behindMesh.position.y = randomized_y(Z_MAP_BEHIND);
+					behindMesh.position.z = planet.z;
+					
+					behindMesh.rotation.x = -Math.PI/2;
+					//behindMesh.scale.set(mscale,mscale,mscale);
+					behindMesh.scale.set(mapscale.x,mapscale.y,mapscale.z);
+					scene.add(behindMesh);
+					
+					behindMeshes.push(behindMesh);
+				}
 			}
+		
 		}
 		
 		loaded.map_behind = true;
@@ -3465,7 +3494,8 @@ function load_map_water(path){
 
 
 
-function load_map_collision(path){
+function load_map_collision(path, planet_type){
+	console.log("load_map_collision: "+path);
 	return new THREE.TextureLoader().load(path, function(tex){
 		tex.image = correct_texture_size(tex.image);
 		console.warn("GRAVITY.points", stringify(GRAVITY.points));
@@ -3507,48 +3537,47 @@ function load_map_collision(path){
 
 			for(let i = 0; i < PLANETS.length; i++){
 				let planet = PLANETS[i];
-				let collisiondata = {
-					'x': planet.x,
-					'z': planet.z,
-					'w': tex.image.width,
-					'h': tex.image.height,
-					'kx': 0,
-					'kz': 0,
-					'data': hitdata,
-				};
-				COLLISION_DATA['MAP_DATA'].push(collisiondata);
-				GRAVITY.points.push({
-					'x': planet.x,
-					'z': planet.z,
-					'kx': 0,
-					'kz': 0,
-					'range': planet.range,
-					'minradius': planet.minradius,
-				});
-				console.warn("gravity.points.push", {
-					'x': planet.x,
-					'z': planet.z,
-					'range': planet.range,
-					'minradius': planet.minradius,
-				});
-				
-				let mesh = new THREE.Mesh(geometry, material);
+				if(planet.type == planet_type){
+					let collisiondata = {
+						'x': planet.x,
+						'z': planet.z,
+						'w': tex.image.width,
+						'h': tex.image.height,
+						'kx': 0,
+						'kz': 0,
+						'data': hitdata,
+					};
+					COLLISION_DATA['MAP_DATA'].push(collisiondata);
+					GRAVITY.points.push({
+						'x': planet.x,
+						'z': planet.z,
+						'kx': 0,
+						'kz': 0,
+						'range': planet.range,
+						'minradius': planet.minradius,
+					});
+					console.warn("gravity.points.push", {
+						'x': planet.x,
+						'z': planet.z,
+						'range': planet.range,
+						'minradius': planet.minradius,
+					});
+					
+					let mesh = new THREE.Mesh(geometry, material);
 
-				mesh.rotation.x = -Math.PI/2;
-				
-				mesh.position.x = collisiondata.x;
-				mesh.position.y = randomized_y(Z_MAP_COLLISION);
-				mesh.position.z = collisiondata.z;
-				
-				mesh.scale.set(mapscale.x,mapscale.y,mapscale.z);
-				
-				collisionMeshes.push(mesh);
-				collisionMeshesData.push({
-					kx: 0,
-					kz: 0,
-				});
-				scene.add(mesh);
+					mesh.rotation.x = -Math.PI/2;
+					
+					mesh.position.x = collisiondata.x;
+					mesh.position.y = randomized_y(Z_MAP_COLLISION);
+					mesh.position.z = collisiondata.z;
+					
+					mesh.scale.set(mapscale.x,mapscale.y,mapscale.z);
+					
+					collisionMeshes.push(mesh);
+					scene.add(mesh);
+				}
 			}
+			
 		}
 		
 		if(WATER_ENABLED){
@@ -3844,10 +3873,15 @@ function load_map(){
 	}
 	
 	
-	mapCollisionTex = load_map_collision(texture_path('collision'));
+	mapCollisionTex = load_map_collision(texture_path('collision'), "big");
 	mapBehindEmissiveTex = load_map_behind_lights(texture_path('map_behind_lights_url'));
-	mapBehindTex = load_map_behind(texture_path('map_behind_url'));
+	mapBehindTex = load_map_behind(texture_path('map_behind_url'), "big");
 	mapFrontTex = load_map_front(texture_path('map_front_url'));
+	
+	// load small planets:
+	mapCollisionSmallTex = load_map_collision(map_texture_path('small_earth.png'), "small");
+	mapBehindSmallTex = load_map_behind(map_texture_path('small_earth_back.png'), "small");
+
 
 	if(WATER_ENABLED){
 		mapWaterTex = load_map_water(texture_path('map_water_url'));
@@ -4140,14 +4174,15 @@ function pre_init(){
 
 			let mesh = new THREE.Mesh(geometry, material);
 			let mscale = 1;
-			mesh.position.x = 2973;
-			mesh.position.z = -1183;
+			mesh.position.x = 5100;
 			mesh.position.y = Z_SOLDIER;
+			mesh.position.z = -367;
 
 			mesh.rotation.x = -Math.PI/2;
 			mesh.scale.set(mscale,mscale,mscale);
 			
 			var i = add_player(mesh, TYPE_SOLDIER);
+			change_player(i);
 			soldierPlayer = i;
 			
 			scene.add(mesh);
@@ -4452,7 +4487,7 @@ function pre_init(){
 		mesh.position.y = Z_PLANE;
 
 		mesh.rotation.x = -Math.PI/2;
-		mesh.scale.set(mscale,-mscale,mscale);
+		mesh.scale.set(mscale,mscale,mscale);
 		
 		var i = add_player(mesh, TYPE_SANTA);
 		santaPlayer = i;
@@ -4795,7 +4830,7 @@ ufo player:
 		mesh.scale.set(-mscale,mscale,mscale);
 	
 		var i = add_player(mesh, TYPE_PLANE);
-		change_player(i);
+		//change_player(i);
 		scene.add(mesh);
 
 	});
@@ -5613,10 +5648,9 @@ function get_gravity_angle_debug(x,z){
 
 
 function get_force(x, z, point){
-	let dist = get_dist_2d(x, z, point.x, point.z);
-	if(dist > point.range){
-		//dist = point.range;
-	}
+	//let dist = get_dist_2d(x, z, point.x, point.z);
+	let dist = Math.sqrt((point.x-x)*(point.x-x)+(point.z-z)*(point.z-z));
+	 
 	let dist_percent = dist/point.minradius;
 	if(dist_percent > 1) dist_percent = 1;
 	
@@ -5624,18 +5658,26 @@ function get_force(x, z, point){
 		dist = point.minradius;
 	}
 	
-	return GRAVITY.value * ((6000000*dist_percent)/(dist*dist));
+	let mass = point.minradius*point.minradius;
+	
+	return GRAVITY.value * ((mass*dist_percent)/(dist*dist));
 }
 
 
+
+
 function apply_gravity(obj){
+	let pi2 = Math.PI/2;
 	if(GRAVITY.style == GRAVITY_CIRCULAR){
 		for(let i = 0; i < GRAVITY.points.length; i++){
 			let point = GRAVITY.points[i];
-			let gdir = new get_kxy(obj.x, obj.z, point.x, point.z);
+			//let gdir = new get_kxy(obj.x, obj.z, point.x, point.z);
+			let rads = Math.atan2(point.z-obj.z, obj.x-point.x);
 			let force = get_force(obj.x, obj.z, point);
-			obj.kx += gdir.x*force;
-			obj.kz += gdir.z*force;
+			obj.kx += Math.sin(rads-pi2)*force;
+			obj.kz += Math.cos(rads-pi2)*force;
+			//obj.kx += gdir.x*force;
+			//obj.kz += gdir.z*force;
 		}
 	}else{
 		// default to linear gravity.
@@ -5699,9 +5741,7 @@ function apply_edge_rules(obj){
 function get_trajectory_points(){
 
 	let player = players[myPlayer];
-
 	let dire_bullet = new get_kxy_angle(player.shoot_angle);
-	
 	let bullet_speed = 20*player.shot_speed_multi;
 
 	let shot = {
@@ -5722,30 +5762,48 @@ function get_trajectory_points(){
 	}
 
 	let trajectory_points = [];
-
+	
+	//let prev_angle = 666666;
+	//let prev_x = shot.x;
+	//let prev_z = shot.z;
+	//let ground_found = false;
+	
 	for(let i = 0; i < maxframes; i++){
+		//let angle = get_angle_rads(prev_x, prev_z, shot.x, shot.z);
+	
+		//if(Math.abs(angle-prev_angle) > 0.02){
 		if((i % 8) == 0){
 			trajectory_points.push({
 				'x': shot.x, 
-				'y': Z_RAIN, 
 				'z': shot.z,
 			});
+			//prev_angle = angle;
 		}
+
+		
+		// add last point if ground found or it was last maximum frame:
+		if(is_ground(shot.x, shot.z) || i == maxframes-1){
+			//trajectory_points.push({
+			//	'x': prev_x, 
+			//	'z': prev_z,
+			//});
+			trajectory_points.push({
+				'x': shot.x, 
+				'z': shot.z,
+			});
+			//ground_found = true;
+			break;
+		}
+		
+		//prev_x = shot.x;
+		//prev_z = shot.z;
 		
 		shot.x += shot.kx;
 		shot.z += shot.kz;
-		
+			
 		apply_gravity(shot);
-		
-		if(is_ground(shot.x, shot.z)){
-			trajectory_points.push({
-				'x': shot.x, 
-				'y': Z_RAIN, 
-				'z': shot.z,
-			});
-			break;
-		}
 	}
+
 	
 	return trajectory_points;
 }
@@ -5771,12 +5829,12 @@ function create_edge_points(trajectory_points, radius){
 		let r = (1/camera.zoom)*radius; // radius<=0.8 is best, doesnt leave holes in middle of line.
 		trajectory_points2.push({
 			'x': cur_point.x+left_dire.x*r,
-			'y': cur_point.y,
+			//'y': cur_point.y,
 			'z': cur_point.z+left_dire.z*r,
 		});
 		trajectory_points3.push({
 			'x': cur_point.x+right_dire.x*r,
-			'y': cur_point.y,
+			//'y': cur_point.y,
 			'z': cur_point.z+right_dire.z*r,
 		});
 	}
@@ -6518,7 +6576,8 @@ function render(renderFrame){
 				explosion.x += explosion.kx;
 				explosion.z += explosion.kz;
 				
-				explosion.kx *= 0.95;
+				//explosion.kx *= 0.95;
+				apply_gravity(explosion);
 				
 				explosion.mesh.position.x = explosion.x;
 				explosion.mesh.position.z = explosion.z;
@@ -6771,7 +6830,7 @@ function render(renderFrame){
 			
 			
 			if(player.type == TYPE_SOLDIER){
-				let ground_found = is_ground(player.x, player.z+18);
+				let ground_found = is_ground(player.x, player.z);
 					
 				if(ground_found){
 					player.kx = 0;
@@ -6812,9 +6871,11 @@ function render(renderFrame){
 				if(tilt_speed < -max_tilt_speed) tilt_speed = -max_tilt_speed;
 				let tilt_angle = (-tilt_speed/max_tilt_speed)*max_tilt_angle;
 				player.mesh.rotation.z = deg2rad(tilt_angle);
+			}else if(player.type == TYPE_SOLDIER){
+				player.mesh.rotation.z = deg2rad(player.angle-180);
+				//player.mesh.rotation.z = deg2rad(gangle);
 			}else{
 				player.mesh.rotation.z = deg2rad(player.angle);
-				//player.mesh.rotation.z = deg2rad(gangle);
 			}
 			
 
@@ -6870,10 +6931,12 @@ function render(renderFrame){
 		let player = players[myPlayer];
 		let trajectory_points = get_trajectory_points();
 		
+		console.log(trajectory_points.length);
+		
 		let edge_points = create_edge_points(trajectory_points, 1);
 		let edge_points2 = create_edge_points(trajectory_points, 1.2*2);
 		
-		// doesnt really affect performance 1 or 5 lines.
+		// doesnt really affect performance even with 5 lines.
 		update_trajectory(player.trajectory_mesh4, edge_points2.left);
 		update_trajectory(player.trajectory_mesh2, edge_points.left);
 		update_trajectory(player.trajectory_mesh, trajectory_points);
@@ -8359,14 +8422,14 @@ function update_trajectory(trajectory_mesh, new_points){
 			// put remaining points in the last point position, 
 			//   so we can draw shorter lines than max line length.
 			vertices[v+0] = last_point.x;
-			vertices[v+1] = last_point.y;
+			vertices[v+1] = Z_RAIN;
 			vertices[v+2] = last_point.z;
 			trajectory_mesh.geometry.attributes.position.count = p;
 			break;
 		}else{
 			if(p < new_points.length){
 				vertices[v+0] = new_points[p].x;
-				vertices[v+1] = new_points[p].y;
+				vertices[v+1] = Z_RAIN;
 				vertices[v+2] = new_points[p].z;
 			}else{
 				console.error("points overflowed.");
