@@ -1077,6 +1077,7 @@ var GRAVITY_DEFAULT = {
 
 let PLANETS = [
 	{x:0,     z:0, 		 range:10000, minradius:2500, kx:0, kz:0, type: "big"},
+	
 	{x:5000,     z:0,    range:10000, minradius:500, kx:0, kz:0, type: "small"},
 	{x:6000,     z:1000,    range:10000, minradius:500, kx:0, kz:0, type: "small"},
 	
@@ -1092,6 +1093,7 @@ let PLANETS = [
 ];
 
 
+let PLANET2GRAVITY = {}; // resolve planet index to actual gravity index.
 
 let PLANET_GRAVITY = 0;
 
@@ -3150,7 +3152,7 @@ function load_map_behind_lights(path){
 	});
 }
 
-function load_map_front(path){
+function load_map_front(path, planet_type){
 	return new THREE.TextureLoader().load(path, function(tex){
 		tex.image = correct_texture_size(tex.image);
 		set_loading_desc("Map front loaded");
@@ -3168,16 +3170,19 @@ function load_map_front(path){
 			
 			
 			for(let i = 0; i < PLANETS.length; i++){
-				let mesh = new THREE.Mesh(geometry, material);
-				mesh.visible = SHOW_MAP_BG;
-				let mscale = 1;
-				mesh.position.x = PLANETS[i].x;
-				mesh.position.y = Z_MAP_FRONT;
-				mesh.position.z = PLANETS[i].z;
-				
-				mesh.rotation.x = -Math.PI/2;
-				mesh.scale.set(mscale,mscale,mscale);
-				scene.add(mesh);
+				let planet = PLANETS[i];
+				if(planet.type == planet_type){
+					let mesh = new THREE.Mesh(geometry, material);
+					mesh.visible = SHOW_MAP_BG;
+					let mscale = 1;
+					mesh.position.x = planet.x;
+					mesh.position.y = Z_MAP_FRONT;
+					mesh.position.z = planet.z;
+					
+					mesh.rotation.x = -Math.PI/2;
+					mesh.scale.set(mscale,mscale,mscale);
+					scene.add(mesh);
+				}
 			}
 		}
 		loaded.map_front = true;
@@ -3548,6 +3553,7 @@ function load_map_collision(path, planet_type){
 						'data': hitdata,
 					};
 					COLLISION_DATA['MAP_DATA'].push(collisiondata);
+					
 					GRAVITY.points.push({
 						'x': planet.x,
 						'z': planet.z,
@@ -3556,6 +3562,8 @@ function load_map_collision(path, planet_type){
 						'range': planet.range,
 						'minradius': planet.minradius,
 					});
+					PLANET2GRAVITY[i] = GRAVITY.points.length-1;
+					
 					console.warn("gravity.points.push", {
 						'x': planet.x,
 						'z': planet.z,
@@ -3876,11 +3884,12 @@ function load_map(){
 	mapCollisionTex = load_map_collision(texture_path('collision'), "big");
 	mapBehindEmissiveTex = load_map_behind_lights(texture_path('map_behind_lights_url'));
 	mapBehindTex = load_map_behind(texture_path('map_behind_url'), "big");
-	mapFrontTex = load_map_front(texture_path('map_front_url'));
+	mapFrontTex = load_map_front(texture_path('map_front_url'), "big");
 	
 	// load small planets:
 	mapCollisionSmallTex = load_map_collision(map_texture_path('small_earth.png'), "small");
 	mapBehindSmallTex = load_map_behind(map_texture_path('small_earth_back.png'), "small");
+	//mapFrontSmallTex = load_map_front(texture_path('map_front_url'), "small");
 
 
 	if(WATER_ENABLED){
@@ -5250,10 +5259,12 @@ function post_init(){
 	console.log("GRAVITY");
 	console.log(GRAVITY);
 	
-	
+
+
 	if(mapinfo.hasOwnProperty("units")){
 		load_units(mapinfo.units);
 	}
+
 	
 	spawn_portals();
 	
@@ -5586,6 +5597,19 @@ function get_gravity_angle(x,z){
 		//let a = get_angle(x, z, GRAVITY.point.x, GRAVITY.point.z);
 		// must be set after lookAt(), and as fixed value rather than addition/substraction.
 		// no idea why needs 90 degree change..
+		return 90-get_angle(0,0,kx,kz);
+	}else{
+		return 0;
+	}
+}
+
+function get_turret_gravity_angle(x,z, planet_link_index){
+	if(GRAVITY.style == GRAVITY_CIRCULAR){
+		let point = GRAVITY.points[planet_link_index];
+		let dire = new get_kxy(x, z, point.x, point.z);
+		let force = get_force(x, z, point);
+		let kx = dire.x*force;
+		let kz = dire.z*force;
 		return 90-get_angle(0,0,kx,kz);
 	}else{
 		return 0;
@@ -8088,7 +8112,7 @@ function spawn_turret(unit){
 	let sprite = SPRITES['turret'];
 
 
-	let rotation = get_gravity_angle_debug(x,z);
+	let rotation = get_turret_gravity_angle(x,z, PLANET2GRAVITY[unit.link]);
 
 
 	let foundIndex = find_free_turret(type);
