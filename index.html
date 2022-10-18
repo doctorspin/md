@@ -49,7 +49,7 @@ sdeg: 105.35473869
 13.10.
 - fixed turrets rotation bug(?).
 - added small planets for testing.
-- fixed player offset bug. todo: make offset according to rotation.
+- fixed player offset bug.
 - quickfix to soldier rotation. todo: make it flip according to gravity.
 - quickfix to santa rotation. todo: make it flip according to gravity.
 
@@ -139,6 +139,39 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
+}
+
+
+canvas {
+	//filter: blur( 1 ) brightness( 0.7 ) contrast( 0.4 ) grayscale( 0.4) hue-rotate( 0 ) invert( 0.5 ) opacity( 0.5 ) sepia( 0.5) saturate( 0.9 );
+	//filter: brightness( 1.6 ) saturate(4.5) hue-rotate(-25deg);
+	//filter: brightness( 1 ) saturate(4.5) hue-rotate(-25deg) contrast(1.5) invert(0.9)
+
+	-webkit-animation: filter-animation2 4s infinite;
+	animation: filter-animation2 4s infinite;
+}
+
+@keyframes filter-animation {
+	0% {filter: hue-rotate(0deg);}
+	100% {filter: hue-rotate(360deg);}
+}
+
+@-webkit-keyframes filter-animation {
+	0% {-webkit-filter: hue-rotate(0deg);}
+	100% {-webkit-filter: hue-rotate(360deg);}
+}
+
+
+@keyframes filter-animation2 {
+	0% {filter: contrast(1) saturate(1) hue-rotate(0deg);}
+	50% {filter: contrast(6) saturate(0) hue-rotate(360deg);}
+	100% {filter: contrast(1) saturate(1) hue-rotate(0deg);}
+}
+
+@-webkit-keyframes filter-animation2 {
+	0% {-webkit-filter: contrast(1) saturate(1) hue-rotate(0deg);}
+	50% {-webkit-filter: contrast(6) saturate(0) hue-rotate(360deg);}
+	100% {-webkit-filter: contrast(1) saturate(1) hue-rotate(0deg);}
 }
 
 
@@ -6817,6 +6850,8 @@ function render(renderFrame){
 				
 				/*
 				let dire2 = new get_kxy_angle(90-player.angle);
+				let gdir = new get_kxy_angle(gangle);
+				let gdir2 = new get_kxy_angle(gangle-180);
 				if(dotprod(
 					player.x+dire2.x*2, player.z+dire2.z*2, 
 					player.x+gdir.x*10, player.z+gdir.z*10, 
