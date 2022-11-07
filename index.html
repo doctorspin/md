@@ -39,12 +39,8 @@
 
 <!--
 
-mystic trajectory:
-shot_speed_multi = 0.00005452861175150987
-x: 59687.4
-y: -59478.2
-z: 2189.0
-sdeg: 105.35473869
+4.11.
+- added shields to players. todo: trajectory lines do not match real trajectories.
 
 13.10.
 - fixed turrets rotation bug(?).
@@ -1003,7 +999,7 @@ var ZINSTEP = 160; // WARNING: max seems to be ~165. or else nearest layers wont
 if(!ortho){
 	ZINSTEP = 1;
 }
-let total_layers = 28; // should increase this to match layer count(?)
+let total_layers = 29; // should increase this to match layer count(?)
 var ZIN = -ZINSTEP*total_layers;
 // create new Z-index value
 function NEWZIN(){
@@ -1055,6 +1051,7 @@ var Z_PLANE = NEWZIN(); // airplanes.
 var Z_SOLDIER = NEWZIN(); // soldiers.
 
 
+var Z_MAP_SHIELDS = NEWZIN();
 
 
 var Z_MAP_EXPLOSIONS = NEWZIN();
@@ -1214,6 +1211,9 @@ var TEXTURES = {
 								config: default_texture_config},
 								
 	'glowsprite_url': 			{path: 'sprites/glow2b.png', 
+								config: default_texture_config},
+								
+	'shield': 					{path: 'sprites/shield.png', 
 								config: default_texture_config},
 								
 	'map_bg_parallax_url':		{path: 'maps/parallax.png', 
@@ -1719,6 +1719,7 @@ var explosionSpriteTest = null;
 var explosionRoundTex = null;
 var explosionRoundLaserTex = null;
 var explosionRoundSmallTex = null;
+var shieldTex = null;
 var splashSpriteTest = null;
 var glowspriteTex = null;
 var bombSpriteTest = null;
@@ -1928,6 +1929,7 @@ var gameLoadedVar = false;
 
 // list of things loaded or not. game wont start until all are loaded.
 var loaded = {
+	shield: false,
 	mod_settings: false,
 	map_settings: false,
 	glowsprite: false,
@@ -2108,6 +2110,7 @@ var prevEndingState = -1;
 
 
 var players = [];
+var shields = [];
 
 var lights = [];
 var bombs = [];
@@ -2418,6 +2421,8 @@ function resetVars(){
 
 
 function add_player(mesh, type){
+	let player_index = players.length;
+	
 	if(typeof type === "undefined"){
 		type = TYPE_PLANE;
 	}
@@ -2477,6 +2482,47 @@ function add_player(mesh, type){
 		lane = 1;
 	}
 	
+	let x = mesh.position.x;
+	let y = mesh.position.y;
+	let z = mesh.position.z;
+	
+	let shield = {
+		'x': x,
+		'z': z,
+		'force': 0.5, 
+		'range': 300, 
+		'enabled': true,
+		'opacity': 0.5,
+		'owner': player_index,
+		'shield_mesh': null,
+	};
+	
+	
+	{
+		let texture = shieldTex.clone();
+		texture.needsUpdate = true;
+		let geometry = new THREE.PlaneGeometry(shield.range*2, shield.range*2);
+		let material = new THREE.MeshBasicMaterial({map: texture, color: 0xFFFFFF});
+		material.color.set(0xFFFFFF);
+		material.transparent = true;
+		material.opacity = shield.opacity;
+		material.side = THREE.DoubleSide;
+		//material.blending = THREE.AdditiveBlending;
+
+		shield.shield_mesh = new THREE.Mesh(geometry, material);
+		shield.shield_mesh.position.x = shield.x;
+		shield.shield_mesh.position.y = randomized_y(Z_MAP_SHIELDS);
+		shield.shield_mesh.position.z = shield.z;
+		
+		shield.shield_mesh.rotation.x = Math.PI/2;
+		
+		scene.add(shield.shield_mesh);
+	}
+	
+	let shield_index = shields.length;
+	shields.push(shield);
+	
+	
 	players.push({
 		'nick': randomNick(),
 		'color': "#FFFFFF",
@@ -2491,6 +2537,7 @@ function add_player(mesh, type){
 		'score': 0,
 		'boostTime': defaultBoostTime, // each frame takes 10 amount of boost. 1 is gained each frame.
 		'boost': false, // if true, then boost is enabled.
+		'shield_index': shield_index,
 		
 		'kx': 0, // unused
 		'kz': 0, // unused
@@ -2525,7 +2572,7 @@ function add_player(mesh, type){
 	});
 	
 	console.log("mesh.position.y: "+mesh.position.y);
-	return players.length-1;
+	return player_index;
 }
 
 
@@ -4416,6 +4463,23 @@ function pre_init(){
 		tex.flipY = false;
 	});
 	
+	shieldTex = new THREE.TextureLoader().load(texture_path('shield'), function(tex){
+		tex.image = correct_texture_size(tex.image);
+		loaded.shield = true;
+		set_loading_desc("Shield loaded");
+		
+		let w = 512;
+		let h = 512;
+
+		tex.minFilter = globalFilter;
+		tex.magFilter = globalFilter;
+		tex.repeat.x = w/tex.image.width;
+		tex.repeat.y = h/tex.image.height;
+		tex.offset.x = 0;
+		tex.offset.y = 0;
+		tex.flipY = false;
+	});
+	
 	
 	explosionRoundTex = new THREE.TextureLoader().load(texture_path('explosion_round'), function(tex){
 		tex.image = correct_texture_size(tex.image);
@@ -5666,6 +5730,28 @@ function get_closest_gravity_angle(x,z){
 	}
 }
 
+
+
+/*
+// not needed?
+function get_antigravity_angle(){
+	let kx = 0;
+	let kz = 0;
+	for(let i = 0; i < shields.length; i++){
+		//a = get_angle(cpx, cpz, GRAVITY.point.x, GRAVITY.point.z);
+		let dire = new get_kxy(x, z, shields[i].x, shields[i].z);
+		let force = get_shield_force(x, z, shields[i]);
+		kx += dire.x*force;
+		kz += dire.z*force;
+	}
+	//let a = get_angle(x, z, GRAVITY.point.x, GRAVITY.point.z);
+	// must be set after lookAt(), and as fixed value rather than addition/substraction.
+	// no idea why needs 90 degree change..
+	return 90-get_angle(0,0,kx,kz);
+}
+*/
+
+
 function get_gravity_angle(x,z){
 	if(GRAVITY.style == GRAVITY_CIRCULAR){
 		let kx = 0;
@@ -5770,6 +5856,48 @@ function get_force(x, z, point){
 	return GRAVITY.value * ((mass*dist_percent)/(dist*dist));
 }
 
+
+
+function get_shield_force(x, z, shield){
+	//let dist = get_dist_2d(x, z, point.x, point.z);
+	let dist = Math.sqrt((shield.x-x)*(shield.x-x)+(shield.z-z)*(shield.z-z));
+	
+	if(dist > shield.range){
+		return 0;
+	}
+	let dist_percent = dist/shield.range;
+	if(dist_percent > 1) dist_percent = 1;
+	 /*
+	let dist_percent = dist/shield.range;
+	if(dist_percent > 1) dist_percent = 1;
+	
+	if(dist < shield.range){
+		dist = shield.range;
+	}
+	
+	let mass = 800000;//shield.range*shield.range;
+	
+	return GRAVITY.value * ((mass*dist_percent)/(dist*dist));
+	*/
+	
+	return shield.force;
+}
+
+
+function apply_shield_effect(obj){
+	let pi2 = Math.PI/2;
+	for(let i = 0; i < shields.length; i++){
+		let shield = shields[i];
+		if(shield.enabled && shield.owner != obj.owner){
+			let force = get_shield_force(obj.x, obj.z, shield);
+			if(force > 0){
+				let rads = Math.atan2(shield.z-obj.z, obj.x-shield.x);
+				obj.kx -= Math.sin(rads-pi2)*force;
+				obj.kz -= Math.cos(rads-pi2)*force;
+			}
+		}
+	}
+}
 
 
 
@@ -5909,6 +6037,7 @@ function get_trajectory_points(){
 		shot.z += shot.kz;
 			
 		apply_gravity(shot);
+		apply_shield_effect(shot);
 	}
 
 	
@@ -6135,6 +6264,7 @@ function render(renderFrame){
 			
 			//shot.kx *= AIR_RESISTANCE;
 			apply_gravity(shot);
+			apply_shield_effect(shot);
 			apply_edge_rules(shot);
 			
 			let hit_sound = "explosion_bullet";
@@ -6242,6 +6372,7 @@ function render(renderFrame){
 			
 			//bomb.kx *= AIR_RESISTANCE;
 			apply_gravity(bomb);
+			apply_shield_effect(bomb);
 			apply_edge_rules(bomb);
 			
 			let bomb_speed = get_dist_2d(0, 0, bomb.kx, bomb.kz);
@@ -6679,6 +6810,8 @@ function render(renderFrame){
 			explosion.texture.offset.x = (frameX*frame_w)/tex_w;
 			explosion.texture.offset.y = (frameY*frame_h)/tex_h;
 			
+			/*
+			// probably will never use.
 			if(explosion.speed > 0){
 				explosion.x += explosion.kx;
 				explosion.z += explosion.kz;
@@ -6689,6 +6822,8 @@ function render(renderFrame){
 				explosion.mesh.position.x = explosion.x;
 				explosion.mesh.position.z = explosion.z;
 			}
+			*/
+			
 		}
 	} // explosions
 
@@ -7050,10 +7185,19 @@ function render(renderFrame){
 			player.trajectory_mesh3.visible = false;
 			player.trajectory_mesh4.visible = false;
 			player.trajectory_mesh5.visible = false;
+			
+			// update shield position:
+			let shield = shields[player.shield_index];
+			shield.x = player.mesh.position.x;
+			shield.z = player.mesh.position.z;
+			
+			shield.shield_mesh.position.x = shield.x;
+			shield.shield_mesh.position.z = shield.z;
 		}
 	} // players
 	
 	
+
 	
 	
 	if(player_trajectories_enabled){
@@ -8842,6 +8986,7 @@ function shoot_turret(turret, owner, shot_allowed, dist){
 					shot.z += shot.kz;
 					
 					apply_gravity(shot);
+					apply_shield_effect(shot);
 					
 				
 				}
@@ -9072,6 +9217,9 @@ function onDocumentKeyDown(event){
 			
 		}else if(keyCode == 76){ // 'L'
 			turret_trajectories_enabled ^= 1;
+
+		}else if(keyCode == 75){ // 'K'
+			player_trajectories_enabled ^= 1;
 
 		}else if(keyCode == 79){ // 'O'
 			PLANET_GRAVITY ^= 1;
