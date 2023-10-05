@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<title>Master Defender</title>
+	<title>Madder Defender</title>
 	<meta charset="utf-8" />
 	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 	<meta http-equiv="Pragma" content="no-cache" />
@@ -38,6 +38,8 @@
 	<script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-7HEP5RL9MR');</script>
 
 <!--
+
+todo: continue at "dots"
 
 4.11.
 - added shields to players. todo: trajectory lines do not match real trajectories.
@@ -855,6 +857,16 @@ class Perlin {
 	}
 }
 
+.keystable {
+	
+}
+.keys_name {
+
+}
+.keys_desc {
+
+}
+
 </style>
 
 <div id="loading_container"><div id="loading_container_inner">
@@ -869,11 +881,41 @@ class Perlin {
 
 <div id="pause_container"><div id="pause_container_inner">
 	<div id="pause_text">GAME PAUSED</div>
-	<div id="pause_desc"><span id="by_enter">Press ESC</span><span id="by_click">Click</span> to unpause</div>
-	<!--
-	<div>Settings</div>
-	<div>Keys</div>
-	-->
+	<div id="pause_desc">
+		<span id="by_enter">Press ESC</span><span id="by_click">Click</span> to unpause
+	</div>
+			
+	
+	<div>
+		<div>Keys</div>
+		<table class="keystable">
+		<tr><td class="keys_name">Controls</td><td class="keys_desc">ASDW</td></tr>
+		<tr><td class="keys_name">Change player</td><td class="keys_desc">1,2,3,4,5</td></tr>
+		<tr><td class="keys_name">GUI</td><td class="keys_desc">F4</td></tr>
+		<tr><td class="keys_name">Reset turrets</td><td class="keys_desc">P (twice to enable them too)</td></tr>
+		<tr><td class="keys_name">Test background</td><td class="keys_desc">0</td></tr>
+		<tr><td class="keys_name">Rain</td><td class="keys_desc">9</td></tr>
+		<tr><td class="keys_name">Change bullet size</td><td class="keys_desc">8 to increase, 7 to decrease</td></tr>
+		<tr><td class="keys_name">Night mode</td><td class="keys_desc">N</td></tr>
+		<tr><td class="keys_name">Sunset mode</td><td class="keys_desc">M</td></tr>
+		<tr><td class="keys_name">Spawn bombers</td><td class="keys_desc">B</td></tr>
+		<tr><td class="keys_name">Turret trajectories</td><td class="keys_desc">L</td></tr>
+		<tr><td class="keys_name">Player shot trajectories</td><td class="keys_desc">K</td></tr>
+		<tr><td class="keys_name">Shoot</td><td class="keys_desc">Left click</td></tr>
+		<tr><td class="keys_name">Change weapon</td><td class="keys_desc">Middle mouse button</td></tr>
+		<tr><td class="keys_name">Flip airplane</td><td class="keys_desc">Right click</td></tr>
+		
+		<tr><td class="keys_name">Camera mode</td><td class="keys_desc">ENTER</td></tr>
+		<!--<tr><td class="keys_name">xxxx</td><td class="keys_desc">xxxx</td></tr>
+		<tr><td class="keys_name">xxxx</td><td class="keys_desc">xxxx</td></tr>
+		<tr><td class="keys_name">xxxx</td><td class="keys_desc">xxxx</td></tr>
+		<tr><td class="keys_name">xxxx</td><td class="keys_desc">xxxx</td></tr>
+		-->
+		</table>
+	</div>
+	
+
+	
 </div></div>
 
 <div id="messages_container">
@@ -2516,7 +2558,7 @@ function add_player(mesh, type){
 		
 		shield.shield_mesh.rotation.x = Math.PI/2;
 		
-		scene.add(shield.shield_mesh);
+		//scene.add(shield.shield_mesh);
 	}
 	
 	let shield_index = shields.length;
@@ -3714,6 +3756,11 @@ function load_map_collision(path, planet_type){
 
 
 
+let dots_mesh;
+let dots = [];
+let maxdots = 100;
+
+
 
 
 function load_map(){
@@ -4011,6 +4058,30 @@ function load_map(){
 	}else{
 		loaded.clouds_front = true; // mark as loaded so the game will start.
 	}
+	
+	// add pixels
+	
+	let points = [];
+	dots = [];
+	for(let i = 0; i < maxdots; i++){
+		let x = 5000+Math.random()*5000-5000/2;
+		let z = -300+Math.random()*5000-5000/2;
+		let kx = 0;
+		let kz = 0;
+		let minradius = 4000;
+		dots.push({x:x, z:z, kx:kx, kz:kz, minradius:minradius});
+		points.push(new THREE.Vector3(x, Z_PLANE, z));
+	}
+	
+	let dotGeometry = new THREE.BufferGeometry().setFromPoints(points);
+	dotGeometry.attributes.position.setUsage(THREE.StreamDrawUsage);
+
+	var dotMaterial = new THREE.PointsMaterial({ size: 4, color: 0xFFFF00, sizeAttenuation: false});
+	dots_mesh = new THREE.Points(dotGeometry, dotMaterial);
+	scene.add(dots_mesh);
+	
+	
+	
 
 } // load_map()
 
@@ -5840,6 +5911,10 @@ function get_gravity_angle_debug(x,z){
 
 
 
+
+
+
+
 function get_force(x, z, point){
 	//let dist = get_dist_2d(x, z, point.x, point.z);
 	let dist = Math.sqrt((point.x-x)*(point.x-x)+(point.z-z)*(point.z-z));
@@ -5898,7 +5973,6 @@ function apply_shield_effect(obj){
 		}
 	}
 }
-
 
 
 function apply_gravity(obj){
@@ -6081,6 +6155,58 @@ function create_edge_points(trajectory_points, radius){
 }
 
 
+
+
+function get_dots_force(dot, px, pz){
+	//let dist = get_dist_2d(x, z, point.x, point.z);
+	let dist = Math.sqrt((px-dot.x)*(px-dot.x)+(pz-dot.z)*(pz-dot.z));
+	 
+	let minradius = dot.minradius;
+	
+	let dist_percent = dist/minradius;
+	if(dist_percent > 1) dist_percent = 1;
+	
+	if(dist < minradius){
+		dist = minradius;
+	}
+	
+	let mass = minradius*minradius;
+	
+	return GRAVITY.value * ((mass*dist_percent)/(dist*dist));
+}
+
+
+// dots_gravity apply_dots_gravity
+function apply_dots_gravity(ii){
+	let pi2 = Math.PI/2;
+	//let points = dots_mesh.geometry.attributes.position.array;
+	
+	let kx = 0;
+	let kz = 0;
+
+	for(let i = 0; i < maxdots; i++){
+		if(i != ii){
+			
+			let x = dots_mesh.geometry.attributes.position.array[i*3+0];
+			let z = dots_mesh.geometry.attributes.position.array[i*3+2];
+			
+			//console.log(x,z);
+			
+			let rads = Math.atan2(z-dots[i].z, dots[i].x-x);
+			let force = get_dots_force(dots[i], x, z);
+
+			kx += Math.sin(rads-pi2)*force;
+			kz += Math.cos(rads-pi2)*force;
+
+		}
+	}
+	
+	dots[ii].kx += kx;
+	dots[ii].kz += kz;
+
+}
+
+
 function render(renderFrame){
 	if(game_paused){
 		return;
@@ -6101,6 +6227,24 @@ function render(renderFrame){
 	if((frameNumber_val % framesPerFps) == 0){
 		updateFPS();
 	}
+	
+		
+	for(let i = 0; i < maxdots; i++){
+		//let arr = dots_mesh.geometry.attributes.position.array;
+		apply_dots_gravity(i);
+	}
+	
+	for(let ii = 0; ii < maxdots; ii++){
+		dots[ii].x += dots[ii].kx;
+		dots[ii].z += dots[ii].kz;
+
+		dots_mesh.geometry.attributes.position.array[ii*3+0] = dots[ii].x;
+		dots_mesh.geometry.attributes.position.array[ii*3+2] = dots[ii].z;
+	}
+	dots_mesh.geometry.attributes.position.needsUpdate = true;
+	
+	
+	
 	
 	if(guivisible){
 		if((frameNumber_val % 5) == 0){
@@ -7207,7 +7351,7 @@ function render(renderFrame){
 		let trajectory_points = get_trajectory_points();
 		
 		//console.log(trajectory_points.length);
-		
+
 		let edge_points = create_edge_points(trajectory_points, 1);
 		let edge_points2 = create_edge_points(trajectory_points, 1.2*2);
 		
@@ -9209,9 +9353,9 @@ function onDocumentKeyDown(event){
 		
 		let curplayer = players[myPlayer];
 
-		if(keyCode == 113){
+		if(keyCode == 113){ // 'F2'
 			// download sounds sound data:
-			download_all_sounds();
+			//download_all_sounds();
 		}else if(keyCode == 66){ // 'B'
 			spawn_bombers();
 			
